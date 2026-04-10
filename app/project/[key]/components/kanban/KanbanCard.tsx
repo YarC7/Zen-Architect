@@ -83,22 +83,24 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
 
         <p className={cn(
           'text-sm font-medium leading-[1.4] transition-all duration-300 flex-1 min-w-0 break-words line-clamp-3',
-          completed ? 'line-through text-muted-foreground/60 italic' : 'text-foreground',
+          'text-foreground',
         )}>
           {card.title}
         </p>
       </div>
 
       {/* Top Right Action: Archive */}
-      <button
-        onClick={e => {
-          e.stopPropagation();
-          onArchive?.(card.id);
-        }}
-        className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-neutral-500/10 hover:text-neutral-500 text-muted-foreground/40"
-      >
-        <Archive className="h-3.5 w-3.5" />
-      </button>
+      {completed && (
+        <button
+          onClick={e => {
+            e.stopPropagation();
+            onArchive?.(card.id);
+          }}
+          className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-neutral-500/10 hover:text-neutral-500 text-muted-foreground/40"
+        >
+          <Archive className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       {/* Footer meta */}
       {(card.dueDate || card.assignees.length > 0 || checklist.length > 0) && (

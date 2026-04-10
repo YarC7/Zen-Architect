@@ -13,8 +13,9 @@ import { Progress } from '@/components/ui/progress';
 import { CalendarIcon, Plus, Trash2, X, CheckSquare, MessageSquare, History, User, Clock, Send, Hash, UserPlus, Paperclip, Tag, LayoutGrid, ChevronDown, Search, Image as ImageIcon, MoreHorizontal, UserMinus, ArrowRight, Copy, CreditCard, SquarePlus, Eye, Share2, Archive, CheckCircle2, Check } from 'lucide-react';
 import { format, isPast, isToday, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Card, LABEL_PRESETS, ChecklistItem, Comment, Activity, ASSIGNEE_COLORS } from '@/types/board';
+import { Card, LABEL_PRESETS, ChecklistItem, Comment, Activity, ASSIGNEE_COLORS, Label } from '@/types/board';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { LabelPopover } from './LabelPopover';
 
 interface CardDetailDialogProps {
   card: Card | null;
@@ -23,6 +24,10 @@ interface CardDetailDialogProps {
   onUpdate: (card: Card) => void;
   onDelete: (cardId: string) => void;
   onAddAssignee: (cardId: string, name: string) => void;
+  labels: Label[];
+  onAddLabel: (name: string, color: string) => string;
+  onUpdateLabel: (id: string, name: string, color: string) => void;
+  onDeleteLabel: (id: string) => void;
 }
 
 let checkId = Date.now();
@@ -104,15 +109,48 @@ function MemberPopoverContent({ card, onUpdate }: { card: Card, onUpdate: (c: Ca
   );
 }
 
-export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete, onAddAssignee }: CardDetailDialogProps) {
+
+
+export function CardDetailDialog({
+  card,
+  open,
+  onOpenChange,
+  onUpdate,
+  onDelete,
+  onAddAssignee,
+  labels,
+  onAddLabel,
+  onUpdateLabel,
+  onDeleteLabel,
+}: CardDetailDialogProps) {
   const [newCheckItem, setNewCheckItem] = useState('');
   const [showActivity, setShowActivity] = useState(true);
   const [localTitle, setLocalTitle] = useState(card?.title || '');
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const checklistRef = useRef<HTMLDivElement>(null);
+  const checklistInputRef = useRef<HTMLInputElement>(null);
+  const [isChecklistVisible, setIsChecklistVisible] = useState(card?.checklist && card.checklist.length > 0);
+
+  useEffect(() => {
+    if (card?.checklist && card.checklist.length > 0) {
+      setIsChecklistVisible(true);
+    }
+  }, [card?.checklist]);
 
   useEffect(() => {
     setLocalTitle(card?.title || '');
   }, [card?.title]);
+
+  const scrollToChecklist = () => {
+    setIsChecklistVisible(true);
+    setTimeout(() => {
+      checklistRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      checklistInputRef.current?.focus();
+    }, 100);
+  };
 
   useEffect(() => {
     if (titleRef.current) {
@@ -151,6 +189,11 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
     setNewCheckItem('');
   };
 
+  const removeChecklist = () => {
+    setIsChecklistVisible(false);
+    onUpdate({ ...card, checklist: [] });
+  };
+
   const removeCheckItem = (itemId: string) => {
     onUpdate({ ...card, checklist: checklist.filter(i => i.id !== itemId) });
   };
@@ -176,7 +219,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto min-w-6xl custom-scrollbar p-0 overflow-hidden">
+      <DialogContent className=" min-w-6xl h-[90vh] flex flex-col  overflow-hidden">
         {/* Top Navigation Header */}
         <div className="flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm sticky top-0 z-50 border-b border-transparent">
           <div className="flex items-center gap-2">
@@ -252,10 +295,10 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
           <DialogTitle>Chi tiết thẻ</DialogTitle>
         </DialogHeader>
 
-        <div className="p-4 pt-0">
-          <div className="flex flex-col md:grid md:grid-cols-12 gap-8">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="grid grid-cols-12 gap-4 h-full overflow-hidden">
             {/* Left Column: Details */}
-            <div className="md:col-span-7 space-y-6">
+            <div className="col-span-12 md:col-span-7 h-full overflow-y-auto custom-scrollbar space-y-6">
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
                   <Button
@@ -264,8 +307,8 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                     onClick={() => onUpdate({ ...card, completed: !card.completed })}
                     className={cn(
                       "h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-4 transition-all duration-300 p-0",
-                      card.completed 
-                        ? "bg-green-400 text-white hover:bg-green-500 shadow-sm" 
+                      card.completed
+                        ? "bg-green-400 text-white hover:bg-green-500 shadow-sm"
                         : "bg-muted/40 text-muted-foreground/20 hover:bg-muted/60 hover:text-muted-foreground/40 border border-muted-foreground/10"
                     )}
                   >
@@ -275,7 +318,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                       <div className="h-2 w-2 rounded-full bg-transparent" />
                     )}
                   </Button>
-                  <div className="flex-1">
+                  <div className="flex-1 w-[90%]">
                     <Textarea
                       ref={titleRef}
                       value={localTitle}
@@ -286,32 +329,61 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                         }
                       }}
                       rows={1}
-                      className="text-5xl font-extrabold border hover:bg-muted/30 focus-visible:bg-muted/20 px-2 py-1 -ml-2 focus-visible:ring-0 resize-none leading-[1.1] transition-all rounded-sm w-[88%] max-w-2xl bg-transparent shadow-none h-auto overflow-hidden block"
+                      className="text-6xl font-extrabold border hover:bg-muted/30 focus-visible:bg-muted/20 px-2 py-2 -ml-2 focus-visible:ring-0 resize-none leading-[1.2] transition-all rounded-sm bg-transparent shadow-none h-auto overflow-hidden block"
                     />
                   </div>
                 </div>
 
                 {/* Quick Actions Bar */}
                 <div className="flex flex-wrap gap-2 py-0.5">
-                  <Popover>
+                  <Popover open={addMenuOpen} onOpenChange={setAddMenuOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
                         <Plus className="h-3.5 w-3.5" /> Thêm
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[320px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="start" sideOffset={10}>
+                    <PopoverContent className="w-[320px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={10}>
                       {/* Popover List */}
                       <div className="p-1.5 space-y-0.5">
                         {[
-                          { icon: Tag, title: 'Nhãn', subtitle: 'Sắp xếp, phân loại và ưu tiên' },
-                          { icon: Clock, title: 'Ngày', subtitle: 'Ngày bắt đầu, ngày hết hạn và lời nhắc' },
-                          { icon: CheckSquare, title: 'Việc cần làm', subtitle: 'Thêm tác vụ con' },
-                          { icon: User, title: 'Thành viên', subtitle: 'Chỉ định thành viên' },
+                          {
+                            icon: Tag,
+                            title: 'Nhãn',
+                            subtitle: 'Sắp xếp, phân loại và ưu tiên',
+                            onClick: () => {
+                              setLabelsOpen(true);
+                              setAddMenuOpen(false);
+                            }
+                          },
+                          {
+                            icon: Clock,
+                            title: 'Ngày',
+                            subtitle: 'Ngày bắt đầu, ngày hết hạn và lời nhắc',
+                          },
+                          {
+                            icon: CheckSquare,
+                            title: 'Việc cần làm',
+                            subtitle: 'Thêm tác vụ con',
+                            onClick: () => {
+                              scrollToChecklist();
+                              setAddMenuOpen(false);
+                            }
+                          },
+                          {
+                            icon: User,
+                            title: 'Thành viên',
+                            subtitle: 'Chỉ định thành viên',
+                            onClick: () => {
+                              setMembersOpen(true);
+                              setAddMenuOpen(false);
+                            }
+                          },
                           { icon: Paperclip, title: 'Đính kèm', subtitle: 'Thêm liên kết, trang, hạng mục công việc, v.v.' },
                         ].map((item, idx) => (
                           <div
                             key={idx}
                             className="flex items-center gap-3.5 p-2 rounded-lg hover:bg-primary/5 cursor-pointer group transition-all"
+                            onClick={item.onClick}
                           >
                             <div className="h-10 w-10 shrink-0 border rounded-lg flex items-center justify-center bg-background shadow-sm group-hover:border-primary/20 group-hover:shadow-md transition-all">
                               <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -326,19 +398,24 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                     </PopoverContent>
                   </Popover>
 
-                  <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all"
+                    onClick={scrollToChecklist}
+                  >
                     <CheckSquare className="h-3.5 w-3.5" /> Việc cần làm
                   </Button>
 
                   {/* Conditionally show "Thành viên" button only if NO assignees */}
                   {card.assignees.length === 0 && (
-                    <Popover>
+                    <Popover open={membersOpen} onOpenChange={setMembersOpen}>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
                           <UserPlus className="h-3.5 w-3.5" /> Thành viên
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="start" sideOffset={10}>
+                      <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={10}>
                         <MemberPopoverContent card={card} onUpdate={onUpdate} />
                       </PopoverContent>
                     </Popover>
@@ -371,13 +448,13 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                             </button>
                           </div>
                         ))}
-                        <Popover>
+                        <Popover open={membersOpen} onOpenChange={setMembersOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="secondary" size="icon" className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-full transition-all hover:scale-105 active:scale-95">
                               <Plus className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="start" sideOffset={10}>
+                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={12}>
                             <MemberPopoverContent card={card} onUpdate={onUpdate} />
                           </PopoverContent>
                         </Popover>
@@ -392,35 +469,33 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                       {card.labels.map(l => (
                         <Badge
                           key={l.id}
-                          className="cursor-pointer text-xs h-8 px-4 font-bold transition-all hover:brightness-90 border-none rounded-md"
+                          className="cursor-pointer text-[11px] h-7 px-3 transition-all hover:brightness-90 border-none rounded-md font-bold"
                           style={{
-                            backgroundColor: `hsl(${l.color})`,
-                            color: 'var(--foreground)',
-                            filter: 'contrast(1.1) brightness(1.1)'
+                            backgroundColor: `hsl(${l.color} / 0.15)`,
+                            color: `hsl(${l.color})`,
                           }}
                           onClick={() => toggleLabel(l)}
                         >
+                          <div className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: `hsl(${l.color})` }} />
                           {l.name}
                         </Badge>
                       ))}
-                      <Popover>
+                      <Popover open={labelsOpen} onOpenChange={setLabelsOpen}>
                         <PopoverTrigger asChild>
                           <Button variant="secondary" size="icon" className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-md transition-all hover:scale-105 active:scale-95 text-muted-foreground">
                             <Plus className="h-4 w-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-60 p-2 space-y-1" align="start">
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase p-1">Tất cả nhãn</p>
-                          {LABEL_PRESETS.map(l => (
-                            <div
-                              key={l.id}
-                              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
-                              onClick={() => toggleLabel(l)}
-                            >
-                              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: `hsl(${l.color})` }} />
-                              <span className="text-xs font-medium">{l.name}</span>
-                            </div>
-                          ))}
+                        <PopoverContent className="w-auto p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="right" sideOffset={12}>
+                            <LabelPopover
+                              card={card}
+                              onUpdate={onUpdate}
+                              availableLabels={labels}
+                              onCreateLabel={onAddLabel}
+                              onUpdateLabel={onUpdateLabel}
+                              onDeleteLabel={onDeleteLabel}
+                              onClose={() => setLabelsOpen(false)}
+                            />
                         </PopoverContent>
                       </Popover>
                     </div>
@@ -444,7 +519,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                             <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                           </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent className="w-auto p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={12}>
                           <Calendar
                             mode="single"
                             selected={dueDate}
@@ -473,59 +548,72 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
               </div>
 
               {/* Checklist */}
-              <div className="bg-muted/10 rounded-xl p-4 border border-dashed border-muted/60 space-y-4">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-bold uppercase tracking-tight">Việc cần làm</p>
-                  {checklist.length > 0 && (
-                    <span className="text-[11px] text-muted-foreground ml-auto bg-muted/50 px-2 py-0.5 rounded-full font-bold">
-                      {checkedCount}/{checklist.length} ({Math.round(progress)}%)
-                    </span>
-                  )}
-                </div>
-                {checklist.length > 0 && (
-                  <Progress value={progress} className="h-2 bg-muted rounded-full" />
-                )}
-                <div className="space-y-1.5">
-                  {checklist.map(item => (
-                    <div key={item.id} className="flex items-center gap-3 group rounded-lg hover:bg-muted/50 px-2 py-1.5 transition-colors">
-                      <Checkbox
-                        checked={item.checked}
-                        onCheckedChange={() => toggleCheckItem(item.id)}
-                        className="h-5 w-5 rounded-md"
-                      />
-                      <span
-                        className={cn(
-                          'text-sm flex-1 transition-all duration-300',
-                          item.checked && 'line-through text-muted-foreground opacity-60',
-                        )}
-                      >
-                        {item.text}
-                      </span>
-                      <button
-                        onClick={() => removeCheckItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+              {isChecklistVisible && (
+                <div ref={checklistRef} className="bg-muted/10 rounded-xl p-4 border border-dashed border-muted/60 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-bold uppercase tracking-tight">Việc cần làm</p>
+                      {checklist.length > 0 && (
+                        <span className="text-[11px] text-muted-foreground ml-2 bg-muted/50 px-2 py-0.5 rounded-full font-bold text-center">
+                          {checkedCount}/{checklist.length} ({Math.round(progress)}%)
+                        </span>
+                      )}
                     </div>
-                  ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={removeChecklist}
+                    >
+                      Loại bỏ
+                    </Button>
+                  </div>
+                  {checklist.length > 0 && (
+                    <Progress value={progress} className="h-2 bg-muted rounded-full" />
+                  )}
+                  <div className="space-y-1.5">
+                    {checklist.map(item => (
+                      <div key={item.id} className="flex items-center gap-3 group rounded-lg hover:bg-muted/50 px-2 py-1.5 transition-colors">
+                        <Checkbox
+                          checked={item.checked}
+                          onCheckedChange={() => toggleCheckItem(item.id)}
+                          className="h-5 w-5 rounded-md"
+                        />
+                        <span
+                          className={cn(
+                            'text-sm flex-1 break-words transition-all duration-300',
+                            item.checked && 'line-through text-muted-foreground opacity-60',
+                          )}
+                        >
+                          {item.text}
+                        </span>
+                        <button
+                          onClick={() => removeCheckItem(item.id)}
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <form
+                    className="flex gap-2"
+                    onSubmit={e => { e.preventDefault(); addCheckItem(); }}
+                  >
+                    <Input
+                      ref={checklistInputRef}
+                      placeholder="Thêm một hạng mục..."
+                      className="h-9 text-sm bg-muted/20 border-muted focus-visible:ring-1 rounded-lg"
+                      value={newCheckItem}
+                      onChange={e => setNewCheckItem(e.target.value)}
+                    />
+                    <Button type="submit" size="sm" variant="secondary" className="h-9 gap-2 px-4 font-bold text-xs rounded-lg">
+                      <Plus className="h-4 w-4" /> Thêm
+                    </Button>
+                  </form>
                 </div>
-                <form
-                  className="flex gap-2"
-                  onSubmit={e => { e.preventDefault(); addCheckItem(); }}
-                >
-                  <Input
-                    placeholder="Thêm một hạng mục..."
-                    className="h-9 text-sm bg-muted/20 border-muted focus-visible:ring-1 rounded-lg"
-                    value={newCheckItem}
-                    onChange={e => setNewCheckItem(e.target.value)}
-                  />
-                  <Button type="submit" size="sm" variant="secondary" className="h-9 gap-2 px-4 font-bold text-xs rounded-lg">
-                    <Plus className="h-4 w-4" /> Thêm
-                  </Button>
-                </form>
-              </div>
+              )}
 
               {(card.updatedAt || card.createdAt) && (
                 <div className="pt-6 border-t flex items-center justify-between">
@@ -537,7 +625,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
             </div>
 
             {/* Right Column: Activity Feed */}
-            <div className="md:col-span-5 h-[70vh] flex flex-col border-l pl-8">
+            <div className="col-span-12 md:col-span-5 h-full flex flex-col border-l pl-4 overflow-hidden">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-primary" />
@@ -555,13 +643,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
 
               <div className="flex-1 flex flex-col gap-6 min-h-0">
                 {/* Comment Input */}
-                <div className="space-y-3 shrink-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Avatar className="h-7 w-7 border shadow-sm">
-                      <AvatarFallback className="bg-primary text-primary-foreground text-[10px]">YOU</AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70">Viết bình luận</span>
-                  </div>
+                <div className="space-y-3 shrink-0 ">
                   <div className="relative group">
                     <Textarea
                       placeholder="Viết bình luận..."
@@ -600,7 +682,7 @@ export function CardDetailDialog({ card, open, onOpenChange, onUpdate, onDelete,
                                 {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                               </span>
                             </div>
-                            <div className="bg-muted/30 border border-muted/50 rounded-2xl rounded-tl-none px-4 py-2.5 text-sm shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+                            <div className="bg-muted/30 border rounded-2xl rounded-tl-none px-2 py-2 text-sm shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                               {comment.text}
                             </div>
                           </div>

@@ -22,6 +22,9 @@ export default function Kanban() {
     updateCard,
     deleteCard,
     addAssignee,
+    addLabel,
+    updateLabel,
+    deleteLabel,
   } = useBoard()
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
@@ -175,6 +178,10 @@ export default function Kanban() {
         onUpdate={updateCard}
         onDelete={deleteCard}
         onAddAssignee={addAssignee}
+        labels={board.labels}
+        onAddLabel={addLabel}
+        onUpdateLabel={updateLabel}
+        onDeleteLabel={deleteLabel}
       />
     </div>
   )

@@ -2,14 +2,19 @@
 
 
 import { useState, useEffect, useCallback } from 'react';
-import { BoardState, Card, Column, DEFAULT_BOARD, ASSIGNEE_COLORS } from '@/types/board';
+import { BoardState, Card, Column, DEFAULT_BOARD, ASSIGNEE_COLORS, Label } from '@/types/board';
 
 const STORAGE_KEY = 'trello-board-state';
 
 function loadBoard(): BoardState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Ensure labels array exists for legacy data
+      if (!parsed.labels) parsed.labels = DEFAULT_BOARD.labels;
+      return parsed;
+    }
   } catch {}
   return DEFAULT_BOARD;
 }
@@ -145,6 +150,50 @@ export function useBoard() {
     });
   }, []);
 
+  const addLabel = useCallback((name: string, color: string) => {
+    const id = genId('label');
+    setBoard(prev => ({
+      ...prev,
+      labels: [...(prev.labels || []), { id, name, color }]
+    }));
+    return id;
+  }, []);
+
+  const updateLabel = useCallback((id: string, name: string, color: string) => {
+    const updatedLabel = { id, name, color };
+    setBoard(prev => {
+      const newLabels = (prev.labels || []).map(l => l.id === id ? updatedLabel : l);
+      const newCards = { ...prev.cards };
+      Object.keys(newCards).forEach(cardId => {
+        const card = newCards[cardId];
+        if (card.labels?.some(l => l.id === id)) {
+          newCards[cardId] = {
+            ...card,
+            labels: card.labels.map(l => l.id === id ? updatedLabel : l)
+          };
+        }
+      });
+      return { ...prev, labels: newLabels, cards: newCards };
+    });
+  }, []);
+
+  const deleteLabel = useCallback((labelId: string) => {
+    setBoard(prev => {
+      const newLabels = (prev.labels || []).filter(l => l.id !== labelId);
+      const newCards = { ...prev.cards };
+      Object.keys(newCards).forEach(cardId => {
+        const card = newCards[cardId];
+        if (card.labels?.some(l => l.id === labelId)) {
+          newCards[cardId] = {
+            ...card,
+            labels: card.labels.filter(l => l.id !== labelId)
+          };
+        }
+      });
+      return { ...prev, labels: newLabels, cards: newCards };
+    });
+  }, []);
+
   return {
     board,
     setBoard,
@@ -158,5 +207,9 @@ export function useBoard() {
     moveCard,
     reorderColumns,
     addAssignee,
+    addLabel,
+    updateLabel,
+    deleteLabel,
+    labels: board.labels,
   };
 }

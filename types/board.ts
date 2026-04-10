@@ -57,6 +57,7 @@ export interface BoardState {
   title: string;
   columns: Column[];
   cards: Record<string, Card>;
+  labels: Label[];
 }
 
 export const LABEL_PRESETS: Label[] = [
@@ -79,6 +80,7 @@ export const ASSIGNEE_COLORS = [
 
 export const DEFAULT_BOARD: BoardState = {
   title: 'My Project Board',
+  labels: LABEL_PRESETS,
   columns: [
     { id: 'col-todo', title: 'To Do', color: '199 89% 48%', cardIds: ['card-1', 'card-2', 'card-3'] },
     { id: 'col-progress', title: 'In Progress', color: '25 95% 53%', cardIds: ['card-4', 'card-5'] },
