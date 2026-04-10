@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import { CollisionPriority } from '@dnd-kit/abstract';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { CalendarIcon, CheckSquare, Circle, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, CheckSquare, Circle, CheckCircle2, Archive, MoreVertical } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { Card } from '@/types/board';
 import { cn } from '@/lib/utils';
@@ -14,9 +14,10 @@ interface KanbanCardProps {
   index: number;
   onClick: () => void;
   onToggleComplete: (cardId: string) => void;
+  onArchive?: (cardId: string) => void;
 }
 
-export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onClick, onToggleComplete }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onClick, onToggleComplete, onArchive }: KanbanCardProps) {
   const { ref, isDragging } = useSortable({
     id: card.id,
     index,
@@ -36,7 +37,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
       ref={ref}
       onClick={onClick}
       className={cn(
-        'rounded-lg border bg-card p-3 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/20',
+        'group relative rounded-lg border bg-card p-3 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/20',
         isDragging && 'opacity-40 shadow-lg ring-2 ring-primary/20',
         completed && 'opacity-70',
       )}
@@ -56,27 +57,48 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
       )}
 
       {/* Title with checkbox */}
-      <div className="flex items-start gap-2">
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            onToggleComplete(card.id);
-          }}
-          className="mt-0.5 shrink-0 transition-colors"
-        >
-          {completed ? (
-            <CheckCircle2 className="h-5 w-5 text-primary" />
-          ) : (
-            <Circle className="h-5 w-5 text-muted-foreground/40 hover:text-muted-foreground" />
-          )}
-        </button>
+      <div className={cn(
+        "grid transition-[grid-template-columns] duration-300 ease-in-out items-start",
+        completed ? "grid-cols-[28px_1fr]" : "grid-cols-[0px_1fr] group-hover:grid-cols-[28px_1fr]"
+      )}>
+        {/* Left Action: Complete */}
+        <div className="overflow-hidden">
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              onToggleComplete(card.id);
+            }}
+            className={cn(
+              "mt-0.5 shrink-0 transition-all duration-300 hover:scale-110 active:scale-90",
+              !completed && "opacity-0 group-hover:opacity-100"
+            )}
+          >
+            {completed ? (
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            ) : (
+              <Circle className="h-5 w-5 text-muted-foreground/40 hover:text-muted-foreground transition-colors" />
+            )}
+          </button>
+        </div>
+
         <p className={cn(
-          'text-sm font-medium leading-snug transition-all duration-200 flex-1 min-w-0 break-all line-clamp-3',
-          completed && 'line-through text-muted-foreground',
+          'text-sm font-medium leading-[1.4] transition-all duration-300 flex-1 min-w-0 break-words line-clamp-3',
+          completed ? 'line-through text-muted-foreground/60 italic' : 'text-foreground',
         )}>
           {card.title}
         </p>
       </div>
+
+      {/* Top Right Action: Archive */}
+      <button
+        onClick={e => {
+          e.stopPropagation();
+          onArchive?.(card.id);
+        }}
+        className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-neutral-500/10 hover:text-neutral-500 text-muted-foreground/40"
+      >
+        <Archive className="h-3.5 w-3.5" />
+      </button>
 
       {/* Footer meta */}
       {(card.dueDate || card.assignees.length > 0 || checklist.length > 0) && (
