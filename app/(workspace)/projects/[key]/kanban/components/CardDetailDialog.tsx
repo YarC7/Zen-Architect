@@ -124,7 +124,7 @@ export function CardDetailDialog({
   onDeleteLabel,
 }: CardDetailDialogProps) {
   const [newCheckItem, setNewCheckItem] = useState('');
-  const [showActivity, setShowActivity] = useState(true);
+  const [showActivity, setShowActivity] = useState(false);
   const [localTitle, setLocalTitle] = useState(card?.title || '');
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);

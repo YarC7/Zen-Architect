@@ -1,6 +1,3 @@
-"use client";
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { BoardState, Card, Column, DEFAULT_BOARD, ASSIGNEE_COLORS, Label } from '@/types/board';
 

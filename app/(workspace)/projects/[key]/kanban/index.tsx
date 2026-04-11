@@ -3,10 +3,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
 import { move } from "@dnd-kit/helpers";
-import { BoardHeader } from "./BoardHeader";
-import { KanbanColumn } from "./KanbanColumn";
-import { CardDetailDialog } from "./CardDetailDialog";
-import { AddColumnInline } from "./AddColumnInline";
+import { BoardHeader } from "./components/BoardHeader";
+import { KanbanColumn } from "./components/KanbanColumn";
+import { CardDetailDialog } from "./components/CardDetailDialog";
+import { AddColumnInline } from "./components/AddColumnInline";
 import { useBoard } from "@/hooks/useBoard";
 import { Assignee, Card } from "@/types/board";
 
