@@ -71,7 +71,7 @@ export function useBoard() {
 
   const addCard = useCallback((colId: string, title: string) => {
     const cardId = genId('card');
-    const card: Card = { id: cardId, title, description: '', labels: [], dueDate: null, assignees: [], checklist: [], completed: false };
+    const card: Card = { id: cardId, title, description: '', labels: [], dueDate: null, startDate: null, dueTime: null, startTime: null, assignees: [], checklist: [], completed: false };
     setBoard(prev => ({
       ...prev,
       cards: { ...prev.cards, [cardId]: card },

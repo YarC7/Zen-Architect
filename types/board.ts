@@ -37,6 +37,9 @@ export interface Card {
   description: string;
   labels: Label[];
   dueDate: string | null; // ISO date string
+  startDate: string | null; // ISO date string
+  dueTime: string | null; // HH:mm 24h format
+  startTime: string | null; // HH:mm 24h format
   assignees: Assignee[];
   checklist: ChecklistItem[];
   completed: boolean;
@@ -92,19 +95,19 @@ export const DEFAULT_BOARD: BoardState = {
       id: 'card-1', title: 'Set up project repository',
       description: 'Initialize the repo with proper folder structure and CI/CD pipeline.',
       labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }],
-      dueDate: '2026-04-15', assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }],
+      startDate: '2026-04-12', dueDate: '2026-04-15', dueTime: null, startTime: null, assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }],
       checklist: [
         { id: 'cl1', text: 'Init repo', checked: true },
         { id: 'cl2', text: 'Add CI/CD pipeline', checked: false },
         { id: 'cl3', text: 'Set up folder structure', checked: true },
       ], completed: false,
     },
-    'card-2': { id: 'card-2', title: 'Design landing page mockup', description: 'Create high-fidelity mockups for the landing page.', labels: [{ id: 'l4', name: 'Design', color: '262 83% 58%' }], dueDate: null, assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }], checklist: [], completed: false },
-    'card-3': { id: 'card-3', title: 'Fix login redirect bug', description: '', labels: [{ id: 'l1', name: 'Bug', color: '0 84% 60%' }, { id: 'l3', name: 'Urgent', color: '25 95% 53%' }], dueDate: '2026-04-08', assignees: [], checklist: [], completed: false },
-    'card-4': { id: 'card-4', title: 'Implement user dashboard', description: 'Build the main dashboard with analytics widgets.', labels: [{ id: 'l2', name: 'Feature', color: '142 71% 45%' }, { id: 'l6', name: 'Frontend', color: '330 81% 60%' }], dueDate: '2026-04-20', assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }, { id: 'a3', name: 'Charlie', color: '262 83% 58%' }], checklist: [], completed: false },
-    'card-5': { id: 'card-5', title: 'Write API documentation', description: 'Document all REST endpoints with examples.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], dueDate: null, assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }], checklist: [], completed: false },
-    'card-6': { id: 'card-6', title: 'Review PR #42 — Auth refactor', description: 'Check the authentication refactor for security issues.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], dueDate: '2026-04-10', assignees: [{ id: 'a3', name: 'Charlie', color: '262 83% 58%' }], checklist: [], completed: false },
-    'card-7': { id: 'card-7', title: 'Set up monitoring alerts', description: 'Configure PagerDuty alerts for production.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], dueDate: null, assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }], checklist: [], completed: true },
-    'card-8': { id: 'card-8', title: 'Update onboarding flow', description: 'Simplified the onboarding to 3 steps.', labels: [{ id: 'l2', name: 'Feature', color: '142 71% 45%' }, { id: 'l4', name: 'Design', color: '262 83% 58%' }], dueDate: '2026-04-05', assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }, { id: 'a1', name: 'Alice', color: '199 89% 48%' }], checklist: [], completed: true },
+    'card-2': { id: 'card-2', title: 'Design landing page mockup', description: 'Create high-fidelity mockups for the landing page.', labels: [{ id: 'l4', name: 'Design', color: '262 83% 58%' }], startDate: null, dueDate: null, dueTime: null, startTime: null, assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }], checklist: [], completed: false },
+    'card-3': { id: 'card-3', title: 'Fix login redirect bug', description: '', labels: [{ id: 'l1', name: 'Bug', color: '0 84% 60%' }, { id: 'l3', name: 'Urgent', color: '25 95% 53%' }], startDate: '2026-04-05', dueDate: '2026-04-08', dueTime: null, startTime: null, assignees: [], checklist: [], completed: false },
+    'card-4': { id: 'card-4', title: 'Implement user dashboard', description: 'Build the main dashboard with analytics widgets.', labels: [{ id: 'l2', name: 'Feature', color: '142 71% 45%' }, { id: 'l6', name: 'Frontend', color: '330 81% 60%' }], startDate: '2026-04-17', dueDate: '2026-04-20', dueTime: null, startTime: null, assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }, { id: 'a3', name: 'Charlie', color: '262 83% 58%' }], checklist: [], completed: false },
+    'card-5': { id: 'card-5', title: 'Write API documentation', description: 'Document all REST endpoints with examples.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], startDate: null, dueDate: null, dueTime: null, startTime: null, assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }], checklist: [], completed: false },
+    'card-6': { id: 'card-6', title: 'Review PR #42 — Auth refactor', description: 'Check the authentication refactor for security issues.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], startDate: '2026-04-07', dueDate: '2026-04-10', dueTime: null, startTime: null, assignees: [{ id: 'a3', name: 'Charlie', color: '262 83% 58%' }], checklist: [], completed: false },
+    'card-7': { id: 'card-7', title: 'Set up monitoring alerts', description: 'Configure PagerDuty alerts for production.', labels: [{ id: 'l5', name: 'Backend', color: '199 89% 48%' }], startDate: null, dueDate: null, dueTime: null, startTime: null, assignees: [{ id: 'a1', name: 'Alice', color: '199 89% 48%' }], checklist: [], completed: true },
+    'card-8': { id: 'card-8', title: 'Update onboarding flow', description: 'Simplified the onboarding to 3 steps.', labels: [{ id: 'l2', name: 'Feature', color: '142 71% 45%' }, { id: 'l4', name: 'Design', color: '262 83% 58%' }], startDate: '2026-04-02', dueDate: '2026-04-05', dueTime: null, startTime: null, assignees: [{ id: 'a2', name: 'Bob', color: '142 71% 45%' }, { id: 'a1', name: 'Alice', color: '199 89% 48%' }], checklist: [], completed: true },
   },
 };

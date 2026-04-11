@@ -9,13 +9,239 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 import { CalendarIcon, Plus, Trash2, X, CheckSquare, MessageSquare, History, User, Clock, Send, Hash, UserPlus, Paperclip, Tag, LayoutGrid, ChevronDown, Search, Image as ImageIcon, MoreHorizontal, UserMinus, ArrowRight, Copy, CreditCard, SquarePlus, Eye, Share2, Archive, CheckCircle2, Check } from 'lucide-react';
 import { format, isPast, isToday, formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Card, LABEL_PRESETS, ChecklistItem, Comment, Activity, ASSIGNEE_COLORS, Label } from '@/types/board';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LabelPopover } from './LabelPopover';
+
+// Date popover matching Trello's date picker UI
+function DatePopover({ card, onUpdate, open, onOpenChange }: {
+  card: Card;
+  onUpdate: (card: Card) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [hasStartDate, setHasStartDate] = React.useState(!!card.startDate);
+  const [hasDueDate, setHasDueDate] = React.useState(!!card.dueDate);
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
+    card.dueDate ? new Date(card.dueDate) : undefined,
+  );
+  const [selectedStartDate, setSelectedStartDate] = React.useState<Date | undefined>(
+    card.startDate ? new Date(card.startDate) : undefined,
+  );
+  const [timeInput, setTimeInput] = React.useState(card.dueTime || '');
+  const [startTimeInput, setStartTimeInput] = React.useState(card.startTime || '');
+  const [activeInput, setActiveInput] = React.useState<'due' | 'start'>(
+    card.dueDate ? 'due' : card.startDate ? 'start' : 'due',
+  );
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setHasStartDate(!!card.startDate);
+      setHasDueDate(!!card.dueDate);
+      setSelectedDate(card.dueDate ? new Date(card.dueDate) : undefined);
+      setSelectedStartDate(card.startDate ? new Date(card.startDate) : undefined);
+      setTimeInput(card.dueTime || '');
+      setStartTimeInput(card.startTime || '');
+      setActiveInput(card.dueDate ? 'due' : card.startDate ? 'start' : 'due');
+    }
+
+    onOpenChange(nextOpen);
+  };
+
+  const saveDates = () => {
+    onUpdate({
+      ...card,
+      startDate: hasStartDate && selectedStartDate ? selectedStartDate.toISOString().split('T')[0] : null,
+      dueDate: hasDueDate && selectedDate ? selectedDate.toISOString().split('T')[0] : null,
+      startTime: hasStartDate && startTimeInput ? startTimeInput : null,
+      dueTime: hasDueDate && timeInput ? timeInput : null,
+    });
+    onOpenChange(false);
+  };
+
+  const removeDates = () => {
+    onUpdate({ ...card, startDate: null, dueDate: null, startTime: null, dueTime: null });
+    setHasStartDate(false);
+    setHasDueDate(false);
+    setSelectedDate(undefined);
+    setSelectedStartDate(undefined);
+    setTimeInput('');
+    setStartTimeInput('');
+    onOpenChange(false);
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (activeInput === 'start') {
+      setSelectedStartDate(date);
+      if (date) setHasStartDate(true);
+    } else {
+      setSelectedDate(date);
+      if (date) setHasDueDate(true);
+    }
+  };
+
+  const dueDateStr = selectedDate
+    ? `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}`
+    : '';
+  const startDateStr = selectedStartDate
+    ? `${selectedStartDate.getDate()}/${selectedStartDate.getMonth() + 1}/${selectedStartDate.getFullYear()}`
+    : '';
+  const isOverdue = selectedDate && isPast(selectedDate) && !isToday(selectedDate);
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-md border transition-colors text-left",
+            isOverdue
+              ? "bg-destructive/10 border-destructive/30 hover:bg-destructive/15"
+              : hasDueDate
+                ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/15"
+                : "bg-muted/30 hover:bg-muted/50 border-transparent",
+          )}
+        >
+          <CalendarIcon className={cn(
+            "h-4 w-4",
+            isOverdue ? "text-destructive" : hasDueDate ? "text-green-500" : "text-muted-foreground",
+          )} />
+          <span className="text-sm font-medium">
+            {hasDueDate && selectedDate
+              ? `${timeInput ? timeInput + ' — ' : ''}${format(selectedDate, 'MMM d, yyyy')}`
+              : 'Chưa thiết lập'}
+          </span>
+          {isOverdue && (
+            <Badge className="bg-destructive text-white border-none py-0.5 px-1.5 text-[9px] font-bold uppercase rounded">
+              Quá hạn
+            </Badge>
+          )}
+          {hasDueDate && !isOverdue && card.completed && (
+            <Badge className="bg-green-600 text-white border-none py-0.5 px-1.5 text-[9px] font-bold uppercase rounded">
+              Hoàn tất
+            </Badge>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-90  p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" avoidCollisions={true} align="center" side="right" sideOffset={12}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2 border-b">
+          <span className="text-sm font-semibold">Ngày</span>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-muted transition-colors"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="p-4 py-0 ">
+          {/* Calendar */}
+          <Calendar
+            mode="single"
+            selected={activeInput === 'start' ? selectedStartDate : selectedDate}
+            onSelect={handleCalendarSelect}
+            className="w-full p-0"
+            locale={vi}
+            classNames={{
+              selected: "bg-blue-100 text-blue-700 hover:bg-blue-100 focus:bg-blue-100 rounded-md",
+              today: "text-blue-600 font-bold after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-blue-500 after:rounded",
+              head_cell: "text-muted-foreground font-normal text-[12px]",
+              cell: "relative text-[13px] text-center w-8 h-8 p-0",
+            }}
+          />
+
+          {/* Start Date */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-muted-foreground">Ngày bắt đầu</label>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={hasStartDate}
+                onCheckedChange={(checked) => {
+                  const isChecked = !!checked;
+                  setHasStartDate(isChecked);
+                  setActiveInput('start');
+                  if (!isChecked) { setSelectedStartDate(undefined); setStartTimeInput(''); }
+                }}
+              />
+              <Input
+                value={startDateStr}
+                onChange={(e) => { const d = parseDateString(e.target.value); if (d) { setSelectedStartDate(d); setHasStartDate(true); } }}
+                onFocus={() => setActiveInput('start')}
+                placeholder="N/T/NNNN"
+                className="h-9 text-sm"
+              />
+              <Input
+                type="time"
+                value={startTimeInput}
+                onChange={(e) => setStartTimeInput(e.target.value)}
+                className="h-9 text-sm w-28"
+                disabled={!hasStartDate}
+              />
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-muted-foreground">Ngày hết hạn</label>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={hasDueDate}
+                onCheckedChange={(checked) => {
+                  const isChecked = !!checked;
+                  setHasDueDate(isChecked);
+                  setActiveInput('due');
+                  if (!isChecked) { setSelectedDate(undefined); setTimeInput(''); }
+                }}
+              />
+              <Input
+                value={dueDateStr}
+                onChange={(e) => { const d = parseDateString(e.target.value); if (d) { setSelectedDate(d); setHasDueDate(true); } }}
+                onFocus={() => setActiveInput('due')}
+                placeholder="N/T/NNNN"
+                className="h-9 text-sm"
+              />
+              <Input
+                type="time"
+                value={timeInput}
+                onChange={(e) => setTimeInput(e.target.value)}
+                className="h-9 text-sm w-28"
+                disabled={!hasDueDate}
+              />
+            </div>
+          </div>
+          {/* Buttons */}
+          <div className="space-y-2 py-2">
+            <Button onClick={saveDates} className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded">
+              Lưu
+            </Button>
+            {(hasStartDate || hasDueDate) && (
+              <Button variant="outline" onClick={removeDates} className="w-full h-10 text-sm text-muted-foreground">
+                Gỡ bỏ
+              </Button>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function parseDateString(value: string): Date | undefined {
+  const parts = value.split(/[\/\-]/).map(Number);
+  if (parts.length === 3 && parts.every(p => !isNaN(p))) {
+    const [day, month, year] = parts;
+    const date = new Date(year, month - 1, day);
+    if (date.getDate() === day && date.getMonth() === month - 1) return date;
+  }
+  return undefined;
+}
 
 interface CardDetailDialogProps {
   card: Card | null;
@@ -133,6 +359,7 @@ export function CardDetailDialog({
   const checklistRef = useRef<HTMLDivElement>(null);
   const checklistInputRef = useRef<HTMLInputElement>(null);
   const [isChecklistVisible, setIsChecklistVisible] = useState(card?.checklist && card.checklist.length > 0);
+  const [dateOpen, setDateOpen] = useState(false);
 
   useEffect(() => {
     if (card?.checklist && card.checklist.length > 0) {
@@ -197,9 +424,6 @@ export function CardDetailDialog({
   const removeCheckItem = (itemId: string) => {
     onUpdate({ ...card, checklist: checklist.filter(i => i.id !== itemId) });
   };
-
-  const dueDate = card.dueDate ? new Date(card.dueDate) : undefined;
-  const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate);
 
   const mockComments: Comment[] = [
     { id: 'c1', author: 'Alice', text: 'I completed the initial repository setup. Please check the CI pipeline.', createdAt: new Date(Date.now() - 3600000).toISOString() },
@@ -359,6 +583,10 @@ export function CardDetailDialog({
                             icon: Clock,
                             title: 'Ngày',
                             subtitle: 'Ngày bắt đầu, ngày hết hạn và lời nhắc',
+                            onClick: () => {
+                              setDateOpen(true);
+                              setAddMenuOpen(false);
+                            }
                           },
                           {
                             icon: CheckSquare,
@@ -503,31 +731,14 @@ export function CardDetailDialog({
 
                   {/* Due Date Section */}
                   <div className="space-y-2.5">
-                    <p className="text-[13px] font-bold text-muted-foreground/80">Ngày hết hạn</p>
+                    <p className="text-[13px] font-bold text-muted-foreground/80">Ngày</p>
                     <div className="flex items-center gap-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <div className="flex items-center gap-3 bg-muted/30 hover:bg-muted/50 px-3 py-2 rounded-md border border-transparent cursor-pointer transition-colors w-fit group">
-                            <span className="text-sm font-semibold tracking-tight">
-                              {dueDate ? format(dueDate, "HH:mm dd 'thg' M, yyyy") : 'Chưa thiết lập'}
-                            </span>
-                            {dueDate && (
-                              <Badge className="bg-green-600 hover:bg-green-700 text-white border-none py-0.5 px-2 text-[10px] font-bold uppercase rounded">
-                                Hoàn tất
-                              </Badge>
-                            )}
-                            <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          </div>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={12}>
-                          <Calendar
-                            mode="single"
-                            selected={dueDate}
-                            onSelect={d => onUpdate({ ...card, dueDate: d ? d.toISOString().split('T')[0] : null })}
-                            className="p-3"
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DatePopover
+                        card={card}
+                        onUpdate={onUpdate}
+                        open={dateOpen}
+                        onOpenChange={setDateOpen}
+                      />
                     </div>
                   </div>
                 </div>

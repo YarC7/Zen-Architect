@@ -241,7 +241,7 @@ export default function ProjectDetail() {
 
       {activeView === "timeline" && (
         <div className="flex-1 overflow-auto p-6">
-          <TimelineView cards={allCards} onCardClick={openCard} />
+          <TimelineView cards={allCards} onCardClick={openCard} onUpdateCard={updateCard} />
         </div>
       )}
 
