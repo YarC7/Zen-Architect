@@ -30,7 +30,7 @@ export const KanbanColumn = memo(function KanbanColumn({
     id: column.id,
     index,
     type: 'column',
-    accept: ['column', 'item'],
+    accept: ['column'],
     collisionPriority: CollisionPriority.Low,
   });
 
@@ -51,7 +51,7 @@ export const KanbanColumn = memo(function KanbanColumn({
       <div
         ref={handleRef}
         className="flex items-center gap-2 px-3 py-2.5 cursor-grab active:cursor-grabbing rounded-t-xl"
-        // style={{ borderTop: `3px solid hsl(${column.color})` }}
+      // style={{ borderTop: `3px solid hsl(${column.color})` }}
       >
         {editingTitle ? (
           <Input

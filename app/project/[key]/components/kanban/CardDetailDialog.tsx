@@ -221,7 +221,7 @@ export function CardDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className=" min-w-6xl h-[90vh] flex flex-col  overflow-hidden">
         {/* Top Navigation Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm sticky top-0 z-50 border-b border-transparent">
+        <div className="flex items-center justify-between  bg-background/80 backdrop-blur-sm sticky top-0 z-50 border-b border-transparent">
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" className="h-8 px-3 text-xs font-bold gap-1.5 bg-muted/60 hover:bg-muted text-foreground rounded-md shadow-none">
               In Progress <ChevronDown className="h-3.5 w-3.5 opacity-60" />
@@ -454,7 +454,7 @@ export function CardDetailDialog({
                               <Plus className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={12}>
+                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="right" sideOffset={12}>
                             <MemberPopoverContent card={card} onUpdate={onUpdate} />
                           </PopoverContent>
                         </Popover>

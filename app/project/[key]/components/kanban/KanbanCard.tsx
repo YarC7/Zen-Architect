@@ -23,6 +23,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
     index,
     group: columnId,
     type: 'item',
+    accept: ['item'],
     collisionPriority: CollisionPriority.High,
   });
 
@@ -37,7 +38,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
       ref={ref}
       onClick={onClick}
       className={cn(
-        'group relative rounded-lg border bg-card p-3 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/20',
+        'group relative rounded-lg border bg-card p-2 shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-primary/20',
         isDragging && 'opacity-40 shadow-lg ring-2 ring-primary/20',
         completed && 'opacity-70',
       )}
@@ -59,7 +60,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
       {/* Title with checkbox */}
       <div className={cn(
         "grid transition-[grid-template-columns] duration-300 ease-in-out items-start",
-        completed ? "grid-cols-[28px_1fr]" : "grid-cols-[0px_1fr] group-hover:grid-cols-[28px_1fr]"
+        completed ? "grid-cols-[22px_1fr]" : "grid-cols-[0px_1fr] group-hover:grid-cols-[22px_1fr]"
       )}>
         {/* Left Action: Complete */}
         <div className="overflow-hidden">
@@ -69,7 +70,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
               onToggleComplete(card.id);
             }}
             className={cn(
-              "mt-0.5 shrink-0 transition-all duration-300 hover:scale-110 active:scale-90",
+              "shrink-0 transition-all duration-300 hover:scale-110 active:scale-90",
               !completed && "opacity-0 group-hover:opacity-100"
             )}
           >
@@ -82,7 +83,7 @@ export const KanbanCard = memo(function KanbanCard({ card, columnId, index, onCl
         </div>
 
         <p className={cn(
-          'text-sm font-medium leading-[1.4] transition-all duration-300 flex-1 min-w-0 break-words line-clamp-3',
+          'text-sm font-medium leading-[1.4] transition-all duration-500 flex-1 min-w-0 break-words line-clamp-3',
           'text-foreground',
         )}>
           {card.title}
