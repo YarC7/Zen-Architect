@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Features
+
+- **Project Management**: Kanban, List, Timeline, and Calendar views for comprehensive task management
+- **Drag-and-Drop Functionality**: Intuitive card movement across different views with @dnd-kit
+- **Calendar Views**: Month and Week views with spanning card support and drag-and-drop
+- **Label Management**: CRUD operations for organizing tasks with labels
+
 ## Getting Started
 
 First, run the development server:

@@ -1,27 +1,91 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Progress } from '@/components/ui/progress';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
-import { CalendarIcon, Plus, Trash2, X, CheckSquare, MessageSquare, History, User, Clock, Send, Hash, UserPlus, Paperclip, Tag, LayoutGrid, ChevronDown, Search, Image as ImageIcon, MoreHorizontal, UserMinus, ArrowRight, Copy, CreditCard, SquarePlus, Eye, Share2, Archive, CheckCircle2, Check } from 'lucide-react';
-import { format, isPast, isToday, formatDistanceToNow } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
-import { vi } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
-import { Card, LABEL_PRESETS, ChecklistItem, Comment, Activity, ASSIGNEE_COLORS, Label } from '@/types/board';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LabelPopover } from './LabelPopover';
+import {
+  CalendarIcon,
+  Plus,
+  Trash2,
+  X,
+  CheckSquare,
+  MessageSquare,
+  History,
+  User,
+  Clock,
+  Send,
+  Hash,
+  UserPlus,
+  Paperclip,
+  Tag,
+  LayoutGrid,
+  ChevronDown,
+  Search,
+  Image as ImageIcon,
+  MoreHorizontal,
+  UserMinus,
+  ArrowRight,
+  Copy,
+  CreditCard,
+  SquarePlus,
+  Eye,
+  Share2,
+  Archive,
+  CheckCircle2,
+  Check,
+} from "lucide-react";
+import { format, isPast, isToday, formatDistanceToNow } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { vi } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import {
+  Card,
+  LABEL_PRESETS,
+  ChecklistItem,
+  Comment,
+  Activity,
+  ASSIGNEE_COLORS,
+  Label,
+} from "@/types/board";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LabelPopover } from "./LabelPopover";
 
 // Date popover matching Trello's date picker UI
-function DatePopover({ card, onUpdate, open, onOpenChange }: {
+function DatePopover({
+  card,
+  onUpdate,
+  open,
+  onOpenChange,
+}: {
   card: Card;
   onUpdate: (card: Card) => void;
   open: boolean;
@@ -32,13 +96,15 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
     card.dueDate ? new Date(card.dueDate) : undefined,
   );
-  const [selectedStartDate, setSelectedStartDate] = React.useState<Date | undefined>(
-    card.startDate ? new Date(card.startDate) : undefined,
+  const [selectedStartDate, setSelectedStartDate] = React.useState<
+    Date | undefined
+  >(card.startDate ? new Date(card.startDate) : undefined);
+  const [timeInput, setTimeInput] = React.useState(card.dueTime || "");
+  const [startTimeInput, setStartTimeInput] = React.useState(
+    card.startTime || "",
   );
-  const [timeInput, setTimeInput] = React.useState(card.dueTime || '');
-  const [startTimeInput, setStartTimeInput] = React.useState(card.startTime || '');
-  const [activeInput, setActiveInput] = React.useState<'due' | 'start'>(
-    card.dueDate ? 'due' : card.startDate ? 'start' : 'due',
+  const [activeInput, setActiveInput] = React.useState<"due" | "start">(
+    card.dueDate ? "due" : card.startDate ? "start" : "due",
   );
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -46,10 +112,12 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
       setHasStartDate(!!card.startDate);
       setHasDueDate(!!card.dueDate);
       setSelectedDate(card.dueDate ? new Date(card.dueDate) : undefined);
-      setSelectedStartDate(card.startDate ? new Date(card.startDate) : undefined);
-      setTimeInput(card.dueTime || '');
-      setStartTimeInput(card.startTime || '');
-      setActiveInput(card.dueDate ? 'due' : card.startDate ? 'start' : 'due');
+      setSelectedStartDate(
+        card.startDate ? new Date(card.startDate) : undefined,
+      );
+      setTimeInput(card.dueTime || "");
+      setStartTimeInput(card.startTime || "");
+      setActiveInput(card.dueDate ? "due" : card.startDate ? "start" : "due");
     }
 
     onOpenChange(nextOpen);
@@ -68,8 +136,13 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
     onUpdate({
       ...card,
-      startDate: hasStartDate && selectedStartDate ? selectedStartDate.toISOString().split('T')[0] : null,
-      dueDate: normalizedDueDate ? normalizedDueDate.toISOString().split('T')[0] : null,
+      startDate:
+        hasStartDate && selectedStartDate
+          ? selectedStartDate.toISOString().split("T")[0]
+          : null,
+      dueDate: normalizedDueDate
+        ? normalizedDueDate.toISOString().split("T")[0]
+        : null,
       startTime: hasStartDate && startTimeInput ? startTimeInput : null,
       dueTime: normalizedDueDate && timeInput ? timeInput : null,
     });
@@ -77,18 +150,24 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
   };
 
   const removeDates = () => {
-    onUpdate({ ...card, startDate: null, dueDate: null, startTime: null, dueTime: null });
+    onUpdate({
+      ...card,
+      startDate: null,
+      dueDate: null,
+      startTime: null,
+      dueTime: null,
+    });
     setHasStartDate(false);
     setHasDueDate(false);
     setSelectedDate(undefined);
     setSelectedStartDate(undefined);
-    setTimeInput('');
-    setStartTimeInput('');
+    setTimeInput("");
+    setStartTimeInput("");
     onOpenChange(false);
   };
 
   const handleCalendarSelect = (date: Date | undefined) => {
-    if (activeInput === 'start') {
+    if (activeInput === "start") {
       setSelectedStartDate(date);
       if (date) setHasStartDate(true);
     } else {
@@ -107,23 +186,26 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
       if (selectedDate && selectedDate < range.from) {
         setSelectedDate(undefined);
         setHasDueDate(false);
-        setTimeInput('');
+        setTimeInput("");
       }
 
-      setActiveInput('due');
+      setActiveInput("due");
       return;
     }
 
     setSelectedDate(range.to);
     setHasDueDate(true);
-    setActiveInput('due');
+    setActiveInput("due");
   };
 
   const useRangeMode = !!selectedStartDate;
-  const compactCalendarClass = "w-full p-0 [--cell-size:--spacing(5)] scale-90 origin-top";
+  const compactCalendarClass =
+    "w-full p-0 [--cell-size:--spacing(5)] scale-90 origin-top";
   const compactCalendarClassNames = {
-    selected: "bg-blue-100 text-blue-700 hover:bg-blue-100 focus:bg-blue-100 rounded-md",
-    today: "text-blue-600 font-bold after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-blue-500 after:rounded",
+    selected:
+      "bg-blue-100 text-blue-700 hover:bg-blue-100 focus:bg-blue-100 rounded-md",
+    today:
+      "text-blue-600 font-bold after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-blue-500 after:rounded",
     head_cell: "text-muted-foreground font-normal text-[11px]",
     cell: "relative text-[12px] text-center w-7 h-7 p-0",
     caption_label: "text-sm font-semibold",
@@ -131,17 +213,18 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
   const dueDateStr = selectedDate
     ? `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}`
-    : '';
+    : "";
   const startDateStr = selectedStartDate
     ? `${selectedStartDate.getDate()}/${selectedStartDate.getMonth() + 1}/${selectedStartDate.getFullYear()}`
-    : '';
-  const isOverdue = selectedDate && isPast(selectedDate) && !isToday(selectedDate);
+    : "";
+  const isOverdue =
+    selectedDate && isPast(selectedDate) && !isToday(selectedDate);
 
   React.useEffect(() => {
     if (isInvalidDueBeforeStart) {
       setSelectedDate(undefined);
       setHasDueDate(false);
-      setTimeInput('');
+      setTimeInput("");
     }
   }, [isInvalidDueBeforeStart]);
 
@@ -159,14 +242,24 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
                 : "bg-muted/30 hover:bg-muted/50 border-transparent",
           )}
         >
-          <CalendarIcon className={cn(
-            "h-4 w-4",
-            isOverdue ? "text-destructive" : hasDueDate ? "text-green-500" : "text-muted-foreground",
-          )} />
+          <CalendarIcon
+            className={cn(
+              "h-4 w-4",
+              isOverdue
+                ? "text-destructive"
+                : hasDueDate
+                  ? "text-green-500"
+                  : "text-muted-foreground",
+            )}
+          />
           <span className="text-sm font-medium">
-            {hasDueDate && selectedDate
-              ? `${timeInput ? timeInput + ' — ' : ''}${format(selectedDate, 'MMM d, yyyy')}`
-              : 'Chưa thiết lập'}
+            {hasStartDate && hasDueDate && selectedStartDate && selectedDate
+              ? `${format(selectedStartDate, "MMM d")} - ${format(selectedDate, "MMM d, yyyy")}`
+              : hasDueDate && selectedDate
+                ? format(selectedDate, "MMM d, yyyy")
+                : hasStartDate && selectedStartDate
+                  ? format(selectedStartDate, "MMM d, yyyy")
+                  : "Chưa thiết lập"}
           </span>
           {isOverdue && (
             <Badge className="bg-destructive text-white border-none py-0.5 px-1.5 text-[9px] font-bold uppercase rounded">
@@ -180,7 +273,13 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-90  p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" avoidCollisions={true} align="center" side="right" sideOffset={12}>
+      <PopoverContent
+        className="w-90  p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+        avoidCollisions={true}
+        align="center"
+        side="right"
+        sideOffset={12}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b">
           <span className="text-sm font-semibold">Ngày</span>
@@ -200,7 +299,7 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
               selected={{ from: selectedStartDate, to: selectedDate }}
               onSelect={handleCalendarRangeSelect}
               disabled={
-                activeInput === 'due' && selectedStartDate
+                activeInput === "due" && selectedStartDate
                   ? { before: selectedStartDate }
                   : undefined
               }
@@ -211,7 +310,9 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
           ) : (
             <Calendar
               mode="single"
-              selected={activeInput === 'start' ? selectedStartDate : selectedDate}
+              selected={
+                activeInput === "start" ? selectedStartDate : selectedDate
+              }
               onSelect={handleCalendarSelect}
               className={compactCalendarClass}
               locale={vi}
@@ -221,15 +322,20 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
           {/* Start Date */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-muted-foreground">Ngày bắt đầu</label>
+            <label className="text-sm font-semibold text-muted-foreground">
+              Ngày bắt đầu
+            </label>
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={hasStartDate}
                 onCheckedChange={(checked) => {
                   const isChecked = !!checked;
                   setHasStartDate(isChecked);
-                  setActiveInput('start');
-                  if (!isChecked) { setSelectedStartDate(undefined); setStartTimeInput(''); }
+                  setActiveInput("start");
+                  if (!isChecked) {
+                    setSelectedStartDate(undefined);
+                    setStartTimeInput("");
+                  }
                 }}
               />
               <Input
@@ -242,11 +348,11 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
                     if (selectedDate && selectedDate < d) {
                       setSelectedDate(undefined);
                       setHasDueDate(false);
-                      setTimeInput('');
+                      setTimeInput("");
                     }
                   }
                 }}
-                onFocus={() => setActiveInput('start')}
+                onFocus={() => setActiveInput("start")}
                 placeholder="N/T/NNNN"
                 className="h-9 text-sm"
               />
@@ -262,15 +368,20 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
           {/* Due Date */}
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-muted-foreground">Ngày hết hạn</label>
+            <label className="text-sm font-semibold text-muted-foreground">
+              Ngày hết hạn
+            </label>
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={hasDueDate}
                 onCheckedChange={(checked) => {
                   const isChecked = !!checked;
                   setHasDueDate(isChecked);
-                  setActiveInput('due');
-                  if (!isChecked) { setSelectedDate(undefined); setTimeInput(''); }
+                  setActiveInput("due");
+                  if (!isChecked) {
+                    setSelectedDate(undefined);
+                    setTimeInput("");
+                  }
                 }}
               />
               <Input
@@ -282,7 +393,7 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
                   setSelectedDate(d);
                   setHasDueDate(true);
                 }}
-                onFocus={() => setActiveInput('due')}
+                onFocus={() => setActiveInput("due")}
                 placeholder="N/T/NNNN"
                 className="h-9 text-sm"
               />
@@ -297,11 +408,18 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
           </div>
           {/* Buttons */}
           <div className="space-y-2 py-2">
-            <Button onClick={saveDates} className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded">
+            <Button
+              onClick={saveDates}
+              className="w-full h-10 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold rounded"
+            >
               Lưu
             </Button>
             {(hasStartDate || hasDueDate) && (
-              <Button variant="outline" onClick={removeDates} className="w-full h-10 text-sm text-muted-foreground">
+              <Button
+                variant="outline"
+                onClick={removeDates}
+                className="w-full h-10 text-sm text-muted-foreground"
+              >
                 Gỡ bỏ
               </Button>
             )}
@@ -314,7 +432,7 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
 function parseDateString(value: string): Date | undefined {
   const parts = value.split(/[\/\-]/).map(Number);
-  if (parts.length === 3 && parts.every(p => !isNaN(p))) {
+  if (parts.length === 3 && parts.every((p) => !isNaN(p))) {
     const [day, month, year] = parts;
     const date = new Date(year, month - 1, day);
     if (date.getDate() === day && date.getMonth() === month - 1) return date;
@@ -339,26 +457,43 @@ let checkId = Date.now();
 
 // Mock board members (normally would come from props/context)
 const BOARD_MEMBERS = [
-  { id: '1', name: 'Nguyễn Đức Cảnh', initials: 'NC', color: ASSIGNEE_COLORS[0] },
-  { id: '2', name: 'Admin Zenarc', initials: 'AZ', color: ASSIGNEE_COLORS[1] },
-  { id: '3', name: 'Trần Văn A', initials: 'VA', color: ASSIGNEE_COLORS[2] },
+  {
+    id: "1",
+    name: "Nguyễn Đức Cảnh",
+    initials: "NC",
+    color: ASSIGNEE_COLORS[0],
+  },
+  { id: "2", name: "Admin Zenarc", initials: "AZ", color: ASSIGNEE_COLORS[1] },
+  { id: "3", name: "Trần Văn A", initials: "VA", color: ASSIGNEE_COLORS[2] },
 ];
 
-function MemberPopoverContent({ card, onUpdate }: { card: Card, onUpdate: (c: Card) => void }) {
-  const [search, setSearch] = useState('');
+function MemberPopoverContent({
+  card,
+  onUpdate,
+}: {
+  card: Card;
+  onUpdate: (c: Card) => void;
+}) {
+  const [search, setSearch] = useState("");
 
-  const filtered = BOARD_MEMBERS.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = BOARD_MEMBERS.filter((m) =>
+    m.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const toggleMember = (member: typeof BOARD_MEMBERS[0]) => {
-    const exists = card.assignees.some(a => a.id === member.id);
+  const toggleMember = (member: (typeof BOARD_MEMBERS)[0]) => {
+    const exists = card.assignees.some((a) => a.id === member.id);
     if (exists) {
-      onUpdate({ ...card, assignees: card.assignees.filter(a => a.id !== member.id) });
+      onUpdate({
+        ...card,
+        assignees: card.assignees.filter((a) => a.id !== member.id),
+      });
     } else {
       onUpdate({
         ...card,
-        assignees: [...card.assignees, { id: member.id, name: member.name, color: member.color }]
+        assignees: [
+          ...card.assignees,
+          { id: member.id, name: member.name, color: member.color },
+        ],
       });
     }
   };
@@ -380,24 +515,28 @@ function MemberPopoverContent({ card, onUpdate }: { card: Card, onUpdate: (c: Ca
         </div>
 
         <div className="space-y-4">
-          <p className="text-xs font-bold text-muted-foreground/80 px-1 uppercase tracking-tight">Thành viên của bảng</p>
+          <p className="text-xs font-bold text-muted-foreground/80 px-1 uppercase tracking-tight">
+            Thành viên của bảng
+          </p>
           <div className="space-y-1">
-            {filtered.map(member => {
-              const isActive = card.assignees.some(a => a.id === member.id);
+            {filtered.map((member) => {
+              const isActive = card.assignees.some((a) => a.id === member.id);
               return (
                 <div
                   key={member.id}
                   onClick={() => toggleMember(member)}
                   className={cn(
                     "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all hover:bg-muted text-sm group",
-                    isActive && "bg-muted/50"
+                    isActive && "bg-muted/50",
                   )}
                 >
                   <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white shadow-sm ring-1 ring-white/10 group-hover:ring-white/20 transition-all">
                     {member.initials}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-foreground">{member.name}</p>
+                    <p className="font-semibold text-foreground">
+                      {member.name}
+                    </p>
                   </div>
                   {isActive && (
                     <div className="h-5 w-5 bg-primary/10 rounded-full flex items-center justify-center">
@@ -414,8 +553,6 @@ function MemberPopoverContent({ card, onUpdate }: { card: Card, onUpdate: (c: Ca
   );
 }
 
-
-
 export function CardDetailDialog({
   card,
   open,
@@ -428,16 +565,18 @@ export function CardDetailDialog({
   onUpdateLabel,
   onDeleteLabel,
 }: CardDetailDialogProps) {
-  const [newCheckItem, setNewCheckItem] = useState('');
+  const [newCheckItem, setNewCheckItem] = useState("");
   const [showActivity, setShowActivity] = useState(false);
-  const [localTitle, setLocalTitle] = useState(card?.title || '');
+  const [localTitle, setLocalTitle] = useState(card?.title || "");
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const checklistRef = useRef<HTMLDivElement>(null);
   const checklistInputRef = useRef<HTMLInputElement>(null);
-  const [isChecklistVisible, setIsChecklistVisible] = useState(card?.checklist && card.checklist.length > 0);
+  const [isChecklistVisible, setIsChecklistVisible] = useState(
+    card?.checklist && card.checklist.length > 0,
+  );
   const [dateOpen, setDateOpen] = useState(false);
 
   useEffect(() => {
@@ -447,42 +586,50 @@ export function CardDetailDialog({
   }, [card?.checklist]);
 
   useEffect(() => {
-    setLocalTitle(card?.title || '');
+    setLocalTitle(card?.title || "");
   }, [card?.title]);
 
   const scrollToChecklist = () => {
     setIsChecklistVisible(true);
     setTimeout(() => {
-      checklistRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      checklistRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
       checklistInputRef.current?.focus();
     }, 100);
   };
 
   useEffect(() => {
     if (titleRef.current) {
-      titleRef.current.style.height = '0px';
-      titleRef.current.style.height = titleRef.current.scrollHeight + 'px';
+      titleRef.current.style.height = "0px";
+      titleRef.current.style.height = titleRef.current.scrollHeight + "px";
     }
   }, [localTitle, open]);
 
   if (!card) return null;
 
-  const toggleLabel = (label: typeof LABEL_PRESETS[0]) => {
-    const has = card.labels.some(l => l.id === label.id);
+  const toggleLabel = (label: (typeof LABEL_PRESETS)[0]) => {
+    const has = card.labels.some((l) => l.id === label.id);
     onUpdate({
       ...card,
-      labels: has ? card.labels.filter(l => l.id !== label.id) : [...card.labels, label],
+      labels: has
+        ? card.labels.filter((l) => l.id !== label.id)
+        : [...card.labels, label],
     });
   };
 
   const checklist = card.checklist || [];
-  const checkedCount = checklist.filter(i => i.checked).length;
-  const progress = checklist.length > 0 ? (checkedCount / checklist.length) * 100 : 0;
+  const checkedCount = checklist.filter((i) => i.checked).length;
+  const progress =
+    checklist.length > 0 ? (checkedCount / checklist.length) * 100 : 0;
 
   const toggleCheckItem = (itemId: string) => {
     onUpdate({
       ...card,
-      checklist: checklist.map(i => i.id === itemId ? { ...i, checked: !i.checked } : i),
+      checklist: checklist.map((i) =>
+        i.id === itemId ? { ...i, checked: !i.checked } : i,
+      ),
     });
   };
 
@@ -490,9 +637,12 @@ export function CardDetailDialog({
     if (!newCheckItem.trim()) return;
     onUpdate({
       ...card,
-      checklist: [...checklist, { id: `chk-${++checkId}`, text: newCheckItem.trim(), checked: false }],
+      checklist: [
+        ...checklist,
+        { id: `chk-${++checkId}`, text: newCheckItem.trim(), checked: false },
+      ],
     });
-    setNewCheckItem('');
+    setNewCheckItem("");
   };
 
   const removeChecklist = () => {
@@ -501,24 +651,60 @@ export function CardDetailDialog({
   };
 
   const removeCheckItem = (itemId: string) => {
-    onUpdate({ ...card, checklist: checklist.filter(i => i.id !== itemId) });
+    onUpdate({ ...card, checklist: checklist.filter((i) => i.id !== itemId) });
   };
 
   const mockComments: Comment[] = [
-    { id: 'c1', author: 'Alice', text: 'I completed the initial repository setup. Please check the CI pipeline.', createdAt: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'c2', author: 'Bob', text: 'Looks good! I will start on the landing page mockup tomorrow.', createdAt: new Date(Date.now() - 7200000).toISOString() }
+    {
+      id: "c1",
+      author: "Alice",
+      text: "I completed the initial repository setup. Please check the CI pipeline.",
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+    },
+    {
+      id: "c2",
+      author: "Bob",
+      text: "Looks good! I will start on the landing page mockup tomorrow.",
+      createdAt: new Date(Date.now() - 7200000).toISOString(),
+    },
   ];
 
   const mockActivities: Activity[] = [
-    { id: 'a1', user: 'Alice', description: 'created this card', createdAt: new Date(Date.now() - 86400000).toISOString(), type: 'create' },
-    { id: 'a2', user: 'Admin', description: 'added Alice to this card', createdAt: new Date(Date.now() - 43200000).toISOString(), type: 'update' },
-    { id: 'a3', user: 'Bob', description: 'moved this card to In Progress', createdAt: new Date(Date.now() - 3600000).toISOString(), type: 'move' }
+    {
+      id: "a1",
+      user: "Alice",
+      description: "created this card",
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      type: "create",
+    },
+    {
+      id: "a2",
+      user: "Admin",
+      description: "added Alice to this card",
+      createdAt: new Date(Date.now() - 43200000).toISOString(),
+      type: "update",
+    },
+    {
+      id: "a3",
+      user: "Bob",
+      description: "moved this card to In Progress",
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+      type: "move",
+    },
   ];
 
   const feedItems = [
-    ...(card.comments || mockComments).map(c => ({ ...c, feedType: 'comment' as const })),
-    ...(card.activities || mockActivities).map(a => ({ ...a, feedType: 'activity' as const }))
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    ...(card.comments || mockComments).map((c) => ({
+      ...c,
+      feedType: "comment" as const,
+    })),
+    ...(card.activities || mockActivities).map((a) => ({
+      ...a,
+      feedType: "activity" as const,
+    })),
+  ].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -526,22 +712,37 @@ export function CardDetailDialog({
         {/* Top Navigation Header */}
         <div className="flex items-center justify-between  bg-background/80 backdrop-blur-sm sticky top-0 z-50 border-b border-transparent">
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" className="h-8 px-3 text-xs font-bold gap-1.5 bg-muted/60 hover:bg-muted text-foreground rounded-md shadow-none">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 px-3 text-xs font-bold gap-1.5 bg-muted/60 hover:bg-muted text-foreground rounded-md shadow-none"
+            >
               In Progress <ChevronDown className="h-3.5 w-3.5 opacity-60" />
             </Button>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-full">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-full"
+            >
               <ImageIcon className="h-4.5 w-4.5" />
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-full">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:bg-muted rounded-full"
+                >
                   <MoreHorizontal className="h-4.5 w-4.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 p-1.5 shadow-2xl rounded-xl border-muted/60">
+              <DropdownMenuContent
+                align="end"
+                className="w-64 p-1.5 shadow-2xl rounded-xl border-muted/60"
+              >
                 <DropdownMenuItem className="flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer">
                   <UserMinus className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Rời đi</span>
@@ -559,7 +760,9 @@ export function CardDetailDialog({
                     <CreditCard className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Đối xứng</span>
                   </div>
-                  <Badge className="h-5 px-1.5 bg-primary/15 text-primary border-none text-[9px] font-bold uppercase rounded">MỚI</Badge>
+                  <Badge className="h-5 px-1.5 bg-primary/15 text-primary border-none text-[9px] font-bold uppercase rounded">
+                    MỚI
+                  </Badge>
                 </DropdownMenuItem>
                 <DropdownMenuItem className="flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer">
                   <SquarePlus className="h-4 w-4 text-muted-foreground" />
@@ -576,7 +779,10 @@ export function CardDetailDialog({
                   <Share2 className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Chia sẻ</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer" onClick={() => onOpenChange(false)}>
+                <DropdownMenuItem
+                  className="flex items-center gap-3 py-2.5 px-3 rounded-lg cursor-pointer"
+                  onClick={() => onOpenChange(false)}
+                >
                   <Archive className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Lưu trữ</span>
                 </DropdownMenuItem>
@@ -607,12 +813,14 @@ export function CardDetailDialog({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onUpdate({ ...card, completed: !card.completed })}
+                    onClick={() =>
+                      onUpdate({ ...card, completed: !card.completed })
+                    }
                     className={cn(
                       "h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-4 transition-all duration-300 p-0",
                       card.completed
                         ? "bg-green-400 text-white hover:bg-green-500 shadow-sm"
-                        : "bg-muted/40 text-muted-foreground/20 hover:bg-muted/60 hover:text-muted-foreground/40 border border-muted-foreground/10"
+                        : "bg-muted/40 text-muted-foreground/20 hover:bg-muted/60 hover:text-muted-foreground/40 border border-muted-foreground/10",
                     )}
                   >
                     {card.completed ? (
@@ -625,7 +833,7 @@ export function CardDetailDialog({
                     <Textarea
                       ref={titleRef}
                       value={localTitle}
-                      onChange={e => setLocalTitle(e.target.value)}
+                      onChange={(e) => setLocalTitle(e.target.value)}
                       onBlur={() => {
                         if (card && localTitle !== card.title) {
                           onUpdate({ ...card, title: localTitle });
@@ -641,51 +849,65 @@ export function CardDetailDialog({
                 <div className="flex flex-wrap gap-2 py-0.5">
                   <Popover open={addMenuOpen} onOpenChange={setAddMenuOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all"
+                      >
                         <Plus className="h-3.5 w-3.5" /> Thêm
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[320px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={10}>
+                    <PopoverContent
+                      className="w-[320px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                      align="center"
+                      side="bottom"
+                      sideOffset={10}
+                    >
                       {/* Popover List */}
                       <div className="p-1.5 space-y-0.5">
                         {[
                           {
                             icon: Tag,
-                            title: 'Nhãn',
-                            subtitle: 'Sắp xếp, phân loại và ưu tiên',
+                            title: "Nhãn",
+                            subtitle: "Sắp xếp, phân loại và ưu tiên",
                             onClick: () => {
                               setLabelsOpen(true);
                               setAddMenuOpen(false);
-                            }
+                            },
                           },
                           {
                             icon: Clock,
-                            title: 'Ngày',
-                            subtitle: 'Ngày bắt đầu, ngày hết hạn và lời nhắc',
+                            title: "Ngày",
+                            subtitle: "Ngày bắt đầu, ngày hết hạn và lời nhắc",
                             onClick: () => {
                               setDateOpen(true);
                               setAddMenuOpen(false);
-                            }
+                            },
                           },
                           {
                             icon: CheckSquare,
-                            title: 'Việc cần làm',
-                            subtitle: 'Thêm tác vụ con',
+                            title: "Việc cần làm",
+                            subtitle: "Thêm tác vụ con",
                             onClick: () => {
                               scrollToChecklist();
                               setAddMenuOpen(false);
-                            }
+                            },
                           },
                           {
                             icon: User,
-                            title: 'Thành viên',
-                            subtitle: 'Chỉ định thành viên',
+                            title: "Thành viên",
+                            subtitle: "Chỉ định thành viên",
                             onClick: () => {
                               setMembersOpen(true);
                               setAddMenuOpen(false);
-                            }
+                            },
                           },
-                          { icon: Paperclip, title: 'Đính kèm', subtitle: 'Thêm liên kết, trang, hạng mục công việc, v.v.' },
+                          {
+                            icon: Paperclip,
+                            title: "Đính kèm",
+                            subtitle:
+                              "Thêm liên kết, trang, hạng mục công việc, v.v.",
+                          },
                         ].map((item, idx) => (
                           <div
                             key={idx}
@@ -696,8 +918,12 @@ export function CardDetailDialog({
                               <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                             </div>
                             <div className="space-y-0.5">
-                              <p className="text-[13px] font-bold group-hover:text-primary transition-colors">{item.title}</p>
-                              <p className="text-[10px] text-muted-foreground leading-tight">{item.subtitle}</p>
+                              <p className="text-[13px] font-bold group-hover:text-primary transition-colors">
+                                {item.title}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground leading-tight">
+                                {item.subtitle}
+                              </p>
                             </div>
                           </div>
                         ))}
@@ -718,17 +944,30 @@ export function CardDetailDialog({
                   {card.assignees.length === 0 && (
                     <Popover open={membersOpen} onOpenChange={setMembersOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all"
+                        >
                           <UserPlus className="h-3.5 w-3.5" /> Thành viên
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="bottom" sideOffset={10}>
+                      <PopoverContent
+                        className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                        align="center"
+                        side="bottom"
+                        sideOffset={10}
+                      >
                         <MemberPopoverContent card={card} onUpdate={onUpdate} />
                       </PopoverContent>
                     </Popover>
                   )}
 
-                  <Button variant="outline" size="sm" className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shadow-sm px-3 gap-2 text-muted-foreground font-medium border-muted/60 hover:bg-muted/50 hover:text-foreground transition-all"
+                  >
                     <Paperclip className="h-3.5 w-3.5" /> Đính kèm
                   </Button>
                 </div>
@@ -738,31 +977,60 @@ export function CardDetailDialog({
                   {/* Assignees Section */}
                   {card.assignees.length > 0 && (
                     <div className="space-y-2.5">
-                      <p className="text-[13px] font-bold text-muted-foreground/80">Thành viên</p>
+                      <p className="text-[13px] font-bold text-muted-foreground/80">
+                        Thành viên
+                      </p>
                       <div className="flex flex-wrap gap-2 items-center">
-                        {card.assignees.map(a => (
+                        {card.assignees.map((a) => (
                           <div key={a.id} className="group relative">
                             <Avatar className="h-8 w-8 text-[11px] font-bold shadow-sm ring-2 ring-background transition-transform hover:scale-105">
                               <AvatarFallback className="bg-slate-800 text-white">
-                                {a.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                {a.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <button
-                              onClick={() => onUpdate({ ...card, assignees: card.assignees.filter(ca => ca.id !== a.id) })}
+                              onClick={() =>
+                                onUpdate({
+                                  ...card,
+                                  assignees: card.assignees.filter(
+                                    (ca) => ca.id !== a.id,
+                                  ),
+                                })
+                              }
                               className="absolute -top-1 -right-1 h-4 w-4 bg-muted text-muted-foreground hover:bg-destructive hover:text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-10"
                             >
                               <X className="h-2.5 w-2.5" />
                             </button>
                           </div>
                         ))}
-                        <Popover open={membersOpen} onOpenChange={setMembersOpen}>
+                        <Popover
+                          open={membersOpen}
+                          onOpenChange={setMembersOpen}
+                        >
                           <PopoverTrigger asChild>
-                            <Button variant="secondary" size="icon" className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-full transition-all hover:scale-105 active:scale-95">
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-full transition-all hover:scale-105 active:scale-95"
+                            >
                               <Plus className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="right" sideOffset={12}>
-                            <MemberPopoverContent card={card} onUpdate={onUpdate} />
+                          <PopoverContent
+                            className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                            align="center"
+                            side="right"
+                            sideOffset={12}
+                          >
+                            <MemberPopoverContent
+                              card={card}
+                              onUpdate={onUpdate}
+                            />
                           </PopoverContent>
                         </Popover>
                       </div>
@@ -771,9 +1039,11 @@ export function CardDetailDialog({
 
                   {/* Labels Section */}
                   <div className="space-y-2.5">
-                    <p className="text-[13px] font-bold text-muted-foreground/80">Nhãn</p>
+                    <p className="text-[13px] font-bold text-muted-foreground/80">
+                      Nhãn
+                    </p>
                     <div className="flex flex-wrap gap-2 items-center">
-                      {card.labels.map(l => (
+                      {card.labels.map((l) => (
                         <Badge
                           key={l.id}
                           className="cursor-pointer text-[11px] h-7 px-3 transition-all hover:brightness-90 border-none rounded-md font-bold"
@@ -783,26 +1053,38 @@ export function CardDetailDialog({
                           }}
                           onClick={() => toggleLabel(l)}
                         >
-                          <div className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: `hsl(${l.color})` }} />
+                          <div
+                            className="w-1.5 h-1.5 rounded-full mr-1.5"
+                            style={{ backgroundColor: `hsl(${l.color})` }}
+                          />
                           {l.name}
                         </Badge>
                       ))}
                       <Popover open={labelsOpen} onOpenChange={setLabelsOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="secondary" size="icon" className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-md transition-all hover:scale-105 active:scale-95 text-muted-foreground">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 bg-muted/40 hover:bg-muted/60 border-none rounded-md transition-all hover:scale-105 active:scale-95 text-muted-foreground"
+                          >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden" align="center" side="right" sideOffset={12}>
-                            <LabelPopover
-                              card={card}
-                              onUpdate={onUpdate}
-                              availableLabels={labels}
-                              onCreateLabel={onAddLabel}
-                              onUpdateLabel={onUpdateLabel}
-                              onDeleteLabel={onDeleteLabel}
-                              onClose={() => setLabelsOpen(false)}
-                            />
+                        <PopoverContent
+                          className="w-auto p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                          align="center"
+                          side="right"
+                          sideOffset={12}
+                        >
+                          <LabelPopover
+                            card={card}
+                            onUpdate={onUpdate}
+                            availableLabels={labels}
+                            onCreateLabel={onAddLabel}
+                            onUpdateLabel={onUpdateLabel}
+                            onDeleteLabel={onDeleteLabel}
+                            onClose={() => setLabelsOpen(false)}
+                          />
                         </PopoverContent>
                       </Popover>
                     </div>
@@ -810,7 +1092,9 @@ export function CardDetailDialog({
 
                   {/* Due Date Section */}
                   <div className="space-y-2.5">
-                    <p className="text-[13px] font-bold text-muted-foreground/80">Ngày</p>
+                    <p className="text-[13px] font-bold text-muted-foreground/80">
+                      Ngày
+                    </p>
                     <div className="flex items-center gap-2">
                       <DatePopover
                         card={card}
@@ -827,11 +1111,15 @@ export function CardDetailDialog({
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Hash className="h-4 w-4" />
-                  <p className="text-sm font-bold uppercase tracking-tight">Mô tả</p>
+                  <p className="text-sm font-bold uppercase tracking-tight">
+                    Mô tả
+                  </p>
                 </div>
                 <Textarea
                   value={card.description}
-                  onChange={e => onUpdate({ ...card, description: e.target.value })}
+                  onChange={(e) =>
+                    onUpdate({ ...card, description: e.target.value })
+                  }
                   placeholder="Thêm mô tả chi tiết hơn..."
                   className="min-h-[120px] resize-none bg-muted/10 border-muted focus-visible:ring-1 text-sm p-4 leading-relaxed rounded-xl"
                 />
@@ -839,14 +1127,20 @@ export function CardDetailDialog({
 
               {/* Checklist */}
               {isChecklistVisible && (
-                <div ref={checklistRef} className="bg-muted/10 rounded-xl p-4 border border-dashed border-muted/60 space-y-4">
+                <div
+                  ref={checklistRef}
+                  className="bg-muted/10 rounded-xl p-4 border border-dashed border-muted/60 space-y-4"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckSquare className="h-4 w-4 text-primary" />
-                      <p className="text-sm font-bold uppercase tracking-tight">Việc cần làm</p>
+                      <p className="text-sm font-bold uppercase tracking-tight">
+                        Việc cần làm
+                      </p>
                       {checklist.length > 0 && (
                         <span className="text-[11px] text-muted-foreground ml-2 bg-muted/50 px-2 py-0.5 rounded-full font-bold text-center">
-                          {checkedCount}/{checklist.length} ({Math.round(progress)}%)
+                          {checkedCount}/{checklist.length} (
+                          {Math.round(progress)}%)
                         </span>
                       )}
                     </div>
@@ -860,11 +1154,17 @@ export function CardDetailDialog({
                     </Button>
                   </div>
                   {checklist.length > 0 && (
-                    <Progress value={progress} className="h-2 bg-muted rounded-full" />
+                    <Progress
+                      value={progress}
+                      className="h-2 bg-muted rounded-full"
+                    />
                   )}
                   <div className="space-y-1.5">
-                    {checklist.map(item => (
-                      <div key={item.id} className="flex items-center gap-3 group rounded-lg hover:bg-muted/50 px-2 py-1.5 transition-colors">
+                    {checklist.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 group rounded-lg hover:bg-muted/50 px-2 py-1.5 transition-colors"
+                      >
                         <Checkbox
                           checked={item.checked}
                           onCheckedChange={() => toggleCheckItem(item.id)}
@@ -872,8 +1172,9 @@ export function CardDetailDialog({
                         />
                         <span
                           className={cn(
-                            'text-sm flex-1 break-words transition-all duration-300',
-                            item.checked && 'line-through text-muted-foreground opacity-60',
+                            "text-sm flex-1 break-words transition-all duration-300",
+                            item.checked &&
+                              "line-through text-muted-foreground opacity-60",
                           )}
                         >
                           {item.text}
@@ -889,16 +1190,24 @@ export function CardDetailDialog({
                   </div>
                   <form
                     className="flex gap-2"
-                    onSubmit={e => { e.preventDefault(); addCheckItem(); }}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      addCheckItem();
+                    }}
                   >
                     <Input
                       ref={checklistInputRef}
                       placeholder="Thêm một hạng mục..."
                       className="h-9 text-sm bg-muted/20 border-muted focus-visible:ring-1 rounded-lg"
                       value={newCheckItem}
-                      onChange={e => setNewCheckItem(e.target.value)}
+                      onChange={(e) => setNewCheckItem(e.target.value)}
                     />
-                    <Button type="submit" size="sm" variant="secondary" className="h-9 gap-2 px-4 font-bold text-xs rounded-lg">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="secondary"
+                      className="h-9 gap-2 px-4 font-bold text-xs rounded-lg"
+                    >
                       <Plus className="h-4 w-4" /> Thêm
                     </Button>
                   </form>
@@ -908,7 +1217,11 @@ export function CardDetailDialog({
               {(card.updatedAt || card.createdAt) && (
                 <div className="pt-6 border-t flex items-center justify-between">
                   <span className="text-[11px] text-muted-foreground italic">
-                    Cập nhật lần cuối: {format(new Date((card.updatedAt || card.createdAt)!), 'dd/MM/yyyy')}
+                    Cập nhật lần cuối:{" "}
+                    {format(
+                      new Date((card.updatedAt || card.createdAt)!),
+                      "dd/MM/yyyy",
+                    )}
                   </span>
                 </div>
               )}
@@ -919,7 +1232,9 @@ export function CardDetailDialog({
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-bold uppercase tracking-wider">Hoạt động</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-wider">
+                    Hoạt động
+                  </h3>
                 </div>
                 <Button
                   variant="outline"
@@ -927,7 +1242,7 @@ export function CardDetailDialog({
                   className="h-7 text-[10px] font-bold px-2 border-muted/50 text-muted-foreground hover:bg-muted"
                   onClick={() => setShowActivity(!showActivity)}
                 >
-                  {showActivity ? 'Ẩn chi tiết' : 'Hiện chi tiết'}
+                  {showActivity ? "Ẩn chi tiết" : "Hiện chi tiết"}
                 </Button>
               </div>
 
@@ -953,12 +1268,16 @@ export function CardDetailDialog({
                 {/* Combined Feed List */}
                 <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                   {feedItems.map((item) => {
-                    if (item.feedType === 'activity' && !showActivity) return null;
+                    if (item.feedType === "activity" && !showActivity)
+                      return null;
 
-                    if (item.feedType === 'comment') {
+                    if (item.feedType === "comment") {
                       const comment = item as Comment;
                       return (
-                        <div key={item.id} className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div
+                          key={item.id}
+                          className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+                        >
                           <Avatar className="h-8 w-8 shrink-0 border shadow-sm">
                             <AvatarFallback className="bg-muted text-[10px] font-bold">
                               {comment.author.slice(0, 2).toUpperCase()}
@@ -966,10 +1285,15 @@ export function CardDetailDialog({
                           </Avatar>
                           <div className="flex-1 space-y-1.5">
                             <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-foreground">{comment.author}</span>
+                              <span className="text-[11px] font-bold text-foreground">
+                                {comment.author}
+                              </span>
                               <span className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
                                 <Clock className="h-2.5 w-2.5" />
-                                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                                {formatDistanceToNow(
+                                  new Date(comment.createdAt),
+                                  { addSuffix: true },
+                                )}
                               </span>
                             </div>
                             <div className="bg-muted/30 border rounded-2xl rounded-tl-none px-2 py-2 text-sm shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
@@ -981,22 +1305,40 @@ export function CardDetailDialog({
                     } else {
                       const activity = item as Activity;
                       return (
-                        <div key={item.id} className="relative pl-11 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <div
+                          key={item.id}
+                          className="relative pl-11 animate-in fade-in slide-in-from-left-2 duration-300"
+                        >
                           <div className="absolute left-[15px] top-1/2 -translate-y-1/2 w-[1px] h-full bg-muted/60" />
                           <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm border-muted/30">
-                            {activity.type === 'create' && <Plus className="h-3.5 w-3.5 text-green-500" />}
-                            {activity.type === 'move' && <History className="h-3.5 w-3.5 text-blue-500" />}
-                            {activity.type === 'update' && <User className="h-3.5 w-3.5 text-orange-500" />}
-                            {activity.type === 'comment' && <MessageSquare className="h-3.5 w-3.5 text-primary" />}
+                            {activity.type === "create" && (
+                              <Plus className="h-3.5 w-3.5 text-green-500" />
+                            )}
+                            {activity.type === "move" && (
+                              <History className="h-3.5 w-3.5 text-blue-500" />
+                            )}
+                            {activity.type === "update" && (
+                              <User className="h-3.5 w-3.5 text-orange-500" />
+                            )}
+                            {activity.type === "comment" && (
+                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                            )}
                           </div>
                           <div className="space-y-0.5">
                             <p className="text-[12px] leading-relaxed">
-                              <span className="font-bold text-foreground">{activity.user}</span>{' '}
-                              <span className="text-muted-foreground">{activity.description}</span>
+                              <span className="font-bold text-foreground">
+                                {activity.user}
+                              </span>{" "}
+                              <span className="text-muted-foreground">
+                                {activity.description}
+                              </span>
                             </p>
                             <span className="text-[9px] text-muted-foreground/60 font-medium flex items-center gap-1">
                               <Clock className="h-2.5 w-2.5" />
-                              {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                              {formatDistanceToNow(
+                                new Date(activity.createdAt),
+                                { addSuffix: true },
+                              )}
                             </span>
                           </div>
                         </div>

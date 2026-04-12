@@ -369,6 +369,7 @@ export default function ProjectDetail() {
               const c = board.cards[cardId];
               if (c) updateCard({ ...c, completed: !c.completed });
             }}
+            onUpdateCard={updateCard}
           />
         </div>
       )}

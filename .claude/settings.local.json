@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Skill(gsd:new-project)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)"
     ]
   }
 }
