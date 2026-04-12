@@ -13,6 +13,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 
 import { CalendarIcon, Plus, Trash2, X, CheckSquare, MessageSquare, History, User, Clock, Send, Hash, UserPlus, Paperclip, Tag, LayoutGrid, ChevronDown, Search, Image as ImageIcon, MoreHorizontal, UserMinus, ArrowRight, Copy, CreditCard, SquarePlus, Eye, Share2, Archive, CheckCircle2, Check } from 'lucide-react';
 import { format, isPast, isToday, formatDistanceToNow } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { vi } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Card, LABEL_PRESETS, ChecklistItem, Comment, Activity, ASSIGNEE_COLORS, Label } from '@/types/board';
@@ -54,13 +55,23 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
     onOpenChange(nextOpen);
   };
 
+  const isInvalidDueBeforeStart =
+    !!selectedStartDate && !!selectedDate && selectedDate < selectedStartDate;
+
   const saveDates = () => {
+    const normalizedDueDate =
+      hasDueDate &&
+      selectedDate &&
+      (!selectedStartDate || selectedDate >= selectedStartDate)
+        ? selectedDate
+        : null;
+
     onUpdate({
       ...card,
       startDate: hasStartDate && selectedStartDate ? selectedStartDate.toISOString().split('T')[0] : null,
-      dueDate: hasDueDate && selectedDate ? selectedDate.toISOString().split('T')[0] : null,
+      dueDate: normalizedDueDate ? normalizedDueDate.toISOString().split('T')[0] : null,
       startTime: hasStartDate && startTimeInput ? startTimeInput : null,
-      dueTime: hasDueDate && timeInput ? timeInput : null,
+      dueTime: normalizedDueDate && timeInput ? timeInput : null,
     });
     onOpenChange(false);
   };
@@ -86,6 +97,38 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
     }
   };
 
+  const handleCalendarRangeSelect = (range: DateRange | undefined) => {
+    if (!range?.from) return;
+
+    setSelectedStartDate(range.from);
+    setHasStartDate(true);
+
+    if (!range.to) {
+      if (selectedDate && selectedDate < range.from) {
+        setSelectedDate(undefined);
+        setHasDueDate(false);
+        setTimeInput('');
+      }
+
+      setActiveInput('due');
+      return;
+    }
+
+    setSelectedDate(range.to);
+    setHasDueDate(true);
+    setActiveInput('due');
+  };
+
+  const useRangeMode = !!selectedStartDate;
+  const compactCalendarClass = "w-full p-0 [--cell-size:--spacing(5)] scale-90 origin-top";
+  const compactCalendarClassNames = {
+    selected: "bg-blue-100 text-blue-700 hover:bg-blue-100 focus:bg-blue-100 rounded-md",
+    today: "text-blue-600 font-bold after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-blue-500 after:rounded",
+    head_cell: "text-muted-foreground font-normal text-[11px]",
+    cell: "relative text-[12px] text-center w-7 h-7 p-0",
+    caption_label: "text-sm font-semibold",
+  };
+
   const dueDateStr = selectedDate
     ? `${selectedDate.getDate()}/${selectedDate.getMonth() + 1}/${selectedDate.getFullYear()}`
     : '';
@@ -93,6 +136,14 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
     ? `${selectedStartDate.getDate()}/${selectedStartDate.getMonth() + 1}/${selectedStartDate.getFullYear()}`
     : '';
   const isOverdue = selectedDate && isPast(selectedDate) && !isToday(selectedDate);
+
+  React.useEffect(() => {
+    if (isInvalidDueBeforeStart) {
+      setSelectedDate(undefined);
+      setHasDueDate(false);
+      setTimeInput('');
+    }
+  }, [isInvalidDueBeforeStart]);
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -143,19 +194,30 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
 
         <div className="p-4 py-0 ">
           {/* Calendar */}
-          <Calendar
-            mode="single"
-            selected={activeInput === 'start' ? selectedStartDate : selectedDate}
-            onSelect={handleCalendarSelect}
-            className="w-full p-0"
-            locale={vi}
-            classNames={{
-              selected: "bg-blue-100 text-blue-700 hover:bg-blue-100 focus:bg-blue-100 rounded-md",
-              today: "text-blue-600 font-bold after:content-[''] after:absolute after:bottom-0.5 after:left-1/2 after:-translate-x-1/2 after:w-4 after:h-0.5 after:bg-blue-500 after:rounded",
-              head_cell: "text-muted-foreground font-normal text-[12px]",
-              cell: "relative text-[13px] text-center w-8 h-8 p-0",
-            }}
-          />
+          {useRangeMode ? (
+            <Calendar
+              mode="range"
+              selected={{ from: selectedStartDate, to: selectedDate }}
+              onSelect={handleCalendarRangeSelect}
+              disabled={
+                activeInput === 'due' && selectedStartDate
+                  ? { before: selectedStartDate }
+                  : undefined
+              }
+              className={compactCalendarClass}
+              locale={vi}
+              classNames={compactCalendarClassNames}
+            />
+          ) : (
+            <Calendar
+              mode="single"
+              selected={activeInput === 'start' ? selectedStartDate : selectedDate}
+              onSelect={handleCalendarSelect}
+              className={compactCalendarClass}
+              locale={vi}
+              classNames={compactCalendarClassNames}
+            />
+          )}
 
           {/* Start Date */}
           <div className="space-y-2">
@@ -172,7 +234,18 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
               />
               <Input
                 value={startDateStr}
-                onChange={(e) => { const d = parseDateString(e.target.value); if (d) { setSelectedStartDate(d); setHasStartDate(true); } }}
+                onChange={(e) => {
+                  const d = parseDateString(e.target.value);
+                  if (d) {
+                    setSelectedStartDate(d);
+                    setHasStartDate(true);
+                    if (selectedDate && selectedDate < d) {
+                      setSelectedDate(undefined);
+                      setHasDueDate(false);
+                      setTimeInput('');
+                    }
+                  }
+                }}
                 onFocus={() => setActiveInput('start')}
                 placeholder="N/T/NNNN"
                 className="h-9 text-sm"
@@ -202,7 +275,13 @@ function DatePopover({ card, onUpdate, open, onOpenChange }: {
               />
               <Input
                 value={dueDateStr}
-                onChange={(e) => { const d = parseDateString(e.target.value); if (d) { setSelectedDate(d); setHasDueDate(true); } }}
+                onChange={(e) => {
+                  const d = parseDateString(e.target.value);
+                  if (!d) return;
+                  if (selectedStartDate && d < selectedStartDate) return;
+                  setSelectedDate(d);
+                  setHasDueDate(true);
+                }}
                 onFocus={() => setActiveInput('due')}
                 placeholder="N/T/NNNN"
                 className="h-9 text-sm"
@@ -443,7 +522,7 @@ export function CardDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className=" min-w-6xl h-[90vh] flex flex-col  overflow-hidden">
+      <DialogContent className=" min-w-[88%] h-[90vh] flex flex-col  overflow-hidden">
         {/* Top Navigation Header */}
         <div className="flex items-center justify-between  bg-background/80 backdrop-blur-sm sticky top-0 z-50 border-b border-transparent">
           <div className="flex items-center gap-2">
@@ -854,11 +933,11 @@ export function CardDetailDialog({
 
               <div className="flex-1 flex flex-col gap-6 min-h-0">
                 {/* Comment Input */}
-                <div className="space-y-3 shrink-0 ">
+                <div className="space-y-3 shrink-0 mx-2">
                   <div className="relative group">
                     <Textarea
                       placeholder="Viết bình luận..."
-                      className="min-h-[100px] text-sm resize-none pr-10 focus-visible:ring-primary border-muted/60 transition-all hover:border-muted group-focus-within:border-primary/50 rounded-xl p-4"
+                      className="min-h-[100px] text-sm resize-none focus-visible:ring-primary border-muted/60 transition-all hover:border-muted group-focus-within:border-primary/50 rounded-xl p-2"
                       spellCheck={false}
                     />
                     <Button

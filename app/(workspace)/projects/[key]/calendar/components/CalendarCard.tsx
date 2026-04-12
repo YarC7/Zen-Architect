@@ -21,9 +21,7 @@ export function CalendarCard({
 
   return (
     <div
-      className={`group flex flex-col rounded-md border bg-card hover:shadow-md cursor-pointer transition-shadow ${
-        compact ? "min-h-[28px]" : "min-h-[32px]"
-      }`}
+      className={`group flex flex-col rounded-md border bg-card hover:shadow-md cursor-pointer transition-shadow min-h-[28px]`}
       onClick={() => onClick(card)}
     >
       {/* Colored label bar */}
