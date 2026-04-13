@@ -56,6 +56,86 @@ export function useBoard() {
     }));
   }, []);
 
+  const setColumnColor = useCallback((colId: string, color: string) => {
+    setBoard(prev => ({
+      ...prev,
+      columns: prev.columns.map(c => c.id === colId ? { ...c, color } : c),
+    }));
+  }, []);
+
+  const copyColumn = useCallback((colId: string) => {
+    setBoard(prev => {
+      const col = prev.columns.find(c => c.id === colId);
+      if (!col) return prev;
+
+      const newColId = genId('col');
+      const newCardIds: string[] = [];
+      const newCards = { ...prev.cards };
+
+      col.cardIds.forEach(cardId => {
+        const card = prev.cards[cardId];
+        if (card) {
+          const newCardId = genId('card');
+          newCardIds.push(newCardId);
+          newCards[newCardId] = { ...card, id: newCardId };
+        }
+      });
+
+      const newColumn = {
+        ...col,
+        id: newColId,
+        title: `${col.title} (Copy)`,
+        cardIds: newCardIds,
+      };
+
+      const colIndex = prev.columns.findIndex(c => c.id === colId);
+      const newColumns = [...prev.columns];
+      newColumns.splice(colIndex + 1, 0, newColumn);
+
+      return {
+        ...prev,
+        columns: newColumns,
+        cards: newCards
+      };
+    });
+  }, []);
+
+  const moveAllCards = useCallback((fromColId: string, toColId: string) => {
+    setBoard(prev => {
+      const fromCol = prev.columns.find(c => c.id === fromColId);
+      if (!fromCol || fromColId === toColId) return prev;
+
+      return {
+        ...prev,
+        columns: prev.columns.map(col => {
+          if (col.id === fromColId) {
+            return { ...col, cardIds: [] };
+          }
+          if (col.id === toColId) {
+            return { ...col, cardIds: [...col.cardIds, ...fromCol.cardIds] };
+          }
+          return col;
+        })
+      };
+    });
+  }, []);
+
+  const archiveAllCards = useCallback((colId: string) => {
+    setBoard(prev => {
+      const col = prev.columns.find(c => c.id === colId);
+      if (!col) return prev;
+
+      const newCards = { ...prev.cards };
+      col.cardIds.forEach(id => delete newCards[id]);
+
+      return {
+        ...prev,
+        columns: prev.columns.map(c => c.id === colId ? { ...c, cardIds: [] } : c),
+        cards: newCards
+      };
+    });
+  }, []);
+
   const deleteColumn = useCallback((colId: string) => {
     setBoard(prev => {
       const col = prev.columns.find(c => c.id === colId);
@@ -207,6 +287,10 @@ export function useBoard() {
     addLabel,
     updateLabel,
     deleteLabel,
+    setColumnColor,
+    copyColumn,
+    moveAllCards,
+    archiveAllCards,
     labels: board.labels,
   };
 }

@@ -35,7 +35,11 @@ import { ListView } from "./list";
 import { TimelineView } from "./timeline";
 import { CalendarView } from "./calendar";
 import { CardDetailDialog } from "./kanban/components/CardDetailDialog";
-
+import {
+  DragDropManager,
+  PointerSensor,
+  PointerActivationConstraints,
+} from "@dnd-kit/dom";
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -44,6 +48,10 @@ export default function ProjectDetail() {
     board,
     setBoard,
     setBoardTitle,
+    setColumnColor,
+    copyColumn,
+    moveAllCards,
+    archiveAllCards,
     addColumn,
     renameColumn,
     deleteColumn,
@@ -63,6 +71,20 @@ export default function ProjectDetail() {
   const [activeView, setActiveView] = useState<ViewType>("kanban");
   const [newColTitle, setNewColTitle] = useState("");
   const [showAddCol, setShowAddCol] = useState(false);
+
+  const manager = useMemo(
+    () =>
+      new DragDropManager({
+        sensors: [
+          PointerSensor.configure({
+            activationConstraints: [
+              new PointerActivationConstraints.Distance({ value: 8 }),
+            ],
+          }),
+        ],
+      }),
+    [],
+  );
 
   const allAssignees = useMemo(() => {
     const map = new Map<string, Assignee>();
@@ -325,7 +347,11 @@ export default function ProjectDetail() {
       </div>
 
       {activeView === "kanban" && (
-        <DragDropProvider onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+        <DragDropProvider
+          manager={manager}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
           <div className="flex-1 overflow-x-auto">
             <div className="flex gap-4 p-4 h-full items-start">
               {board.columns.map((col, colIndex) => {
@@ -347,6 +373,11 @@ export default function ProjectDetail() {
                     onRename={(title) => renameColumn(col.id, title)}
                     onDelete={() => deleteColumn(col.id)}
                     onAddCard={(title) => addCard(col.id, title)}
+                    onSetColor={(color) => setColumnColor(col.id, color)}
+                    onCopy={() => copyColumn(col.id)}
+                    onMoveAllCards={(toColId) => moveAllCards(col.id, toColId)}
+                    onArchiveAllCards={() => archiveAllCards(col.id)}
+                    allColumns={board.columns}
                   />
                 );
               })}

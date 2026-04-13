@@ -18,6 +18,10 @@ export default function Kanban() {
     addColumn,
     renameColumn,
     deleteColumn,
+    setColumnColor,
+    copyColumn,
+    moveAllCards,
+    archiveAllCards,
     addCard,
     updateCard,
     deleteCard,
@@ -167,6 +171,11 @@ export default function Kanban() {
                   onRename={(title) => renameColumn(col.id, title)}
                   onDelete={() => deleteColumn(col.id)}
                   onAddCard={(title) => addCard(col.id, title)}
+                  onSetColor={(color) => setColumnColor(col.id, color)}
+                  onCopy={() => copyColumn(col.id)}
+                  onMoveAllCards={(toColId) => moveAllCards(col.id, toColId)}
+                  onArchiveAllCards={() => archiveAllCards(col.id)}
+                  allColumns={board.columns}
                 />
               );
             })}
