@@ -3,7 +3,9 @@
     "allow": [
       "Skill(gsd:new-project)",
       "Bash(npx tsc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm build:*)"
     ]
   }
 }

@@ -26,11 +26,13 @@ import {
   Filter,
   Plus,
   X,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BoardHeader } from "./kanban/components/BoardHeader";
 import { KanbanColumn } from "./kanban/components/KanbanColumn";
 import { AddColumnInline } from "./kanban/components/AddColumnInline";
+import { BoardSettings } from "./kanban/components/BoardSettings";
 import { ListView } from "./list";
 import { TimelineView } from "./timeline";
 import { CalendarView } from "./calendar";
@@ -62,6 +64,11 @@ export default function ProjectDetail() {
     addLabel,
     updateLabel,
     deleteLabel,
+    setBoardBackground,
+    archiveCard,
+    restoreCard,
+    deleteArchivedCard,
+    addActivity,
   } = useBoardForProject(id!);
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -71,6 +78,7 @@ export default function ProjectDetail() {
   const [activeView, setActiveView] = useState<ViewType>("kanban");
   const [newColTitle, setNewColTitle] = useState("");
   const [showAddCol, setShowAddCol] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const manager = useMemo(
     () =>
@@ -175,6 +183,19 @@ export default function ProjectDetail() {
     : null;
 
   const hasFilter = Boolean(filterLabel || filterAssignee);
+  const archivedCount = board.archivedCards ? Object.keys(board.archivedCards).length : 0;
+
+  // Get background style
+  const backgroundStyle = useMemo(() => {
+    if (!board.background) return {};
+    if (board.background.type === "image") {
+      return { backgroundImage: `url(${board.background.value})`, backgroundSize: "cover", backgroundPosition: "center" };
+    }
+    if (board.background.type === "gradient") {
+      return { background: board.background.value };
+    }
+    return { backgroundColor: board.background.value };
+  }, [board.background]);
 
   const allCards = useMemo(() => {
     const cards: Card[] = [];
@@ -188,7 +209,7 @@ export default function ProjectDetail() {
   }, [board, filteredCardIds]);
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col" style={backgroundStyle}>
       <div className="flex items-center gap-2 px-6 pt-4">
         <Button
           variant="ghost"
@@ -341,6 +362,20 @@ export default function ProjectDetail() {
                   <Plus className="h-3.5 w-3.5" /> Add Column
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Settings
+                {archivedCount > 0 && (
+                  <span className="ml-1 rounded-full bg-orange-500 text-white h-4 w-4 text-[10px] flex items-center justify-center">
+                    {archivedCount}
+                  </span>
+                )}
+              </Button>
             </div>
           </div>
         </Tabs>
@@ -436,6 +471,21 @@ export default function ProjectDetail() {
         labels={board.labels}
         onUpdateLabel={updateLabel}
         onDeleteLabel={deleteLabel}
+      />
+
+      <BoardSettings
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        background={board.background}
+        onBackgroundChange={setBoardBackground}
+        labels={board.labels}
+        onAddLabel={addLabel}
+        onUpdateLabel={updateLabel}
+        onDeleteLabel={deleteLabel}
+        archivedCards={board.archivedCards}
+        onRestoreCard={restoreCard}
+        onDeleteArchivedCard={deleteArchivedCard}
+        activities={board.activities}
       />
     </div>
   );

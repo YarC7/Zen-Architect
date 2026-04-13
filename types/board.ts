@@ -56,11 +56,21 @@ export interface Column {
   cardIds: string[];
 }
 
+export type BackgroundType = 'color' | 'image' | 'gradient';
+
+export interface BoardBackground {
+  type: BackgroundType;
+  value: string; // color hex, image URL, or gradient CSS
+}
+
 export interface BoardState {
   title: string;
+  background: BoardBackground;
   columns: Column[];
   cards: Record<string, Card>;
   labels: Label[];
+  archivedCards: Record<string, Card>;
+  activities: Activity[];
 }
 
 export const LABEL_PRESETS: Label[] = [
@@ -83,7 +93,10 @@ export const ASSIGNEE_COLORS = [
 
 export const DEFAULT_BOARD: BoardState = {
   title: 'My Project Board',
+  background: { type: 'color', value: '#f8fafc' },
   labels: LABEL_PRESETS,
+  archivedCards: {},
+  activities: [],
   columns: [
     { id: 'col-todo', title: 'To Do', color: '199 89% 48%', cardIds: ['card-1', 'card-2', 'card-3'] },
     { id: 'col-progress', title: 'In Progress', color: '25 95% 53%', cardIds: ['card-4', 'card-5'] },

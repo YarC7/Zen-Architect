@@ -7,8 +7,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Filter, Plus, X } from "lucide-react";
-import { LABEL_PRESETS, Assignee } from "@/types/board";
+import { Filter, Plus, X, Settings } from "lucide-react";
+import { LABEL_PRESETS, Assignee, BoardBackground, Activity, Card, Label } from "@/types/board";
 
 interface BoardHeaderProps {
   title: string;
@@ -20,6 +20,16 @@ interface BoardHeaderProps {
   onFilterLabel: (id: string | null) => void;
   onFilterAssignee: (id: string | null) => void;
   hideControls?: boolean;
+  background?: BoardBackground;
+  onOpenSettings?: () => void;
+  labels?: Label[];
+  onAddLabel?: (name: string, color: string) => void;
+  onUpdateLabel?: (id: string, name: string, color: string) => void;
+  onDeleteLabel?: (id: string) => void;
+  archivedCards?: Record<string, Card>;
+  onRestoreCard?: (cardId: string) => void;
+  onDeleteArchivedCard?: (cardId: string) => void;
+  activities?: Activity[];
 }
 
 export function BoardHeader({
@@ -32,12 +42,22 @@ export function BoardHeader({
   onFilterLabel,
   onFilterAssignee,
   hideControls = false,
+  onOpenSettings,
+  labels,
+  onAddLabel,
+  onUpdateLabel,
+  onDeleteLabel,
+  archivedCards,
+  onRestoreCard,
+  onDeleteArchivedCard,
+  activities,
 }: BoardHeaderProps) {
   const [editing, setEditing] = useState(false);
   const [newColTitle, setNewColTitle] = useState("");
   const [showAddCol, setShowAddCol] = useState(false);
 
   const hasFilter = filterLabel || filterAssignee;
+  const archivedCount = archivedCards ? Object.keys(archivedCards).length : 0;
 
   return (
     <header className="flex items-center gap-3 px-6 py-4 border-b bg-card flex-wrap">
@@ -149,7 +169,7 @@ export function BoardHeader({
             </PopoverContent>
           </Popover>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             {showAddCol ? (
               <form
                 className="flex gap-2"
@@ -184,6 +204,22 @@ export function BoardHeader({
                 onClick={() => setShowAddCol(true)}
               >
                 <Plus className="h-3.5 w-3.5" /> Add Column
+              </Button>
+            )}
+            {onOpenSettings && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={onOpenSettings}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Settings
+                {archivedCount > 0 && (
+                  <span className="ml-1 rounded-full bg-orange-500 text-white h-4 w-4 text-[10px] flex items-center justify-center">
+                    {archivedCount}
+                  </span>
+                )}
               </Button>
             )}
           </div>

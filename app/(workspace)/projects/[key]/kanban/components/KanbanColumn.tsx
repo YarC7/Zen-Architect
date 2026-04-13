@@ -47,17 +47,17 @@ interface KanbanColumnProps {
 
 const COLUMN_COLORS = [
   { name: "Default", value: "var(--muted)" },
-  { name: "Blue", value: "221.2 83.2% 53.3%" }, // Blue-600
-  { name: "Light Blue", value: "199 89% 48%" },
-  { name: "Rose", value: "346.8 77.2% 49.8%" }, // Rose-600
-  { name: "Orange", value: "24.6 95% 53.1%" }, // Orange-600
-  { name: "Green", value: "142.1 76.2% 36.3%" }, // Green-700
-  { name: "Yellow", value: "47.9 95.8% 53.1%" }, // Yellow-500
-  { name: "Violet", value: "262.1 83.3% 57.8%" }, // Violet-600
-  { name: "Slate", value: "215 16% 47%" },
-  { name: "Deep Purple", value: "271 91% 65%" },
-  { name: "Emerald", value: "160 84% 39%" },
-  { name: "Amber", value: "38 92% 50%" },
+  { name: "Blue", value: "221.2 83.2% 95%" },
+  { name: "Light Blue", value: "199 89% 95%" },
+  { name: "Rose", value: "346.8 77.2% 95%" },
+  { name: "Orange", value: "24.6 95% 95%" },
+  { name: "Green", value: "142.1 76.2% 95%" },
+  { name: "Yellow", value: "47.9 95.8% 95%" },
+  { name: "Violet", value: "262.1 83.3% 95%" },
+  { name: "Slate", value: "215 16% 95%" },
+  { name: "Deep Purple", value: "271 91% 95%" },
+  { name: "Emerald", value: "160 84% 95%" },
+  { name: "Amber", value: "38 92% 95%" },
 ];
 
 export const KanbanColumn = memo(function KanbanColumn({
@@ -100,12 +100,13 @@ export const KanbanColumn = memo(function KanbanColumn({
     return (
       <div
         ref={ref}
-        className={`flex flex-col w-8 min-w-[32px] h-fit self-start rounded-xl border transition-all duration-200 ${isDragging ? "opacity-40" : ""}`}
+        className={cn(
+          "flex flex-col w-8 min-w-[32px] h-fit self-start rounded-xl border transition-all duration-200 shadow-sm",
+          isDragging ? "opacity-40" : "",
+        )}
         style={{
           backgroundColor:
-            column.color === "var(--muted)"
-              ? "hsl(var(--muted)/.5)"
-              : `hsl(${column.color} / 0.1)`,
+            column.color === "var(--muted)" ? "white" : `hsl(${column.color})`,
           borderTop:
             column.color === "var(--muted)"
               ? undefined
@@ -146,12 +147,13 @@ export const KanbanColumn = memo(function KanbanColumn({
   return (
     <div
       ref={ref}
-      className={`flex flex-col w-72 min-w-[288px] rounded-xl border transition-all duration-200 ${isDragging ? "opacity-40" : ""}`}
+      className={cn(
+        "flex flex-col w-72 min-w-[288px] rounded-xl border transition-all duration-200 shadow-sm",
+        isDragging ? "opacity-40" : "",
+      )}
       style={{
         backgroundColor:
-          column.color === "var(--muted)"
-            ? "hsl(var(--muted)/.5)"
-            : `hsl(${column.color} / 0.1)`,
+          column.color === "var(--muted)" ? "white" : `hsl(${column.color})`,
         borderTop:
           column.color === "var(--muted)"
             ? undefined

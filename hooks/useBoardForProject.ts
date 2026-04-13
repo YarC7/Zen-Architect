@@ -4,6 +4,8 @@ import {
   Card,
   ASSIGNEE_COLORS,
   DEFAULT_BOARD,
+  BoardBackground,
+  Activity,
 } from "@/types/board";
 import { loadBoardForProject, saveBoardForProject } from "./useProjects";
 
@@ -16,6 +18,9 @@ function normalizeBoard(state: BoardState): BoardState {
   return {
     ...state,
     labels: state.labels ?? DEFAULT_BOARD.labels,
+    background: state.background ?? DEFAULT_BOARD.background,
+    archivedCards: state.archivedCards ?? {},
+    activities: state.activities ?? [],
   };
 }
 
@@ -306,6 +311,83 @@ export function useBoardForProject(projectId: string) {
     });
   }, []);
 
+  const setBoardBackground = useCallback((background: BoardBackground) => {
+    setBoard((prev) => ({ ...prev, background }));
+  }, []);
+
+  const archiveCard = useCallback((cardId: string) => {
+    setBoard((prev) => {
+      const card = prev.cards[cardId];
+      if (!card) return prev;
+      const { [cardId]: _, ...remainingCards } = prev.cards;
+      const activity: Activity = {
+        id: genId("activity"),
+        type: "delete",
+        user: "User",
+        description: `Archived card "${card.title}"`,
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        cards: remainingCards,
+        archivedCards: { ...prev.archivedCards, [cardId]: card },
+        activities: [...prev.activities, activity],
+        columns: prev.columns.map((c) => ({
+          ...c,
+          cardIds: c.cardIds.filter((id) => id !== cardId),
+        })),
+      };
+    });
+  }, []);
+
+  const restoreCard = useCallback((cardId: string) => {
+    setBoard((prev) => {
+      const card = prev.archivedCards[cardId];
+      if (!card) return prev;
+      const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
+      const firstColumn = prev.columns[0];
+      const activity: Activity = {
+        id: genId("activity"),
+        type: "create",
+        user: "User",
+        description: `Restored card "${card.title}"`,
+        createdAt: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        cards: { ...prev.cards, [cardId]: card },
+        archivedCards: remainingArchived,
+        activities: [...prev.activities, activity],
+        columns: firstColumn
+          ? prev.columns.map((c, i) =>
+              i === 0 ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
+            )
+          : prev.columns,
+      };
+    });
+  }, []);
+
+  const deleteArchivedCard = useCallback((cardId: string) => {
+    setBoard((prev) => {
+      const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
+      return { ...prev, archivedCards: remainingArchived };
+    });
+  }, []);
+
+  const addActivity = useCallback((activity: Omit<Activity, "id" | "createdAt">) => {
+    setBoard((prev) => ({
+      ...prev,
+      activities: [
+        ...prev.activities,
+        {
+          ...activity,
+          id: genId("activity"),
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }));
+  }, []);
+
   return {
     board,
     setBoard,
@@ -326,6 +408,11 @@ export function useBoardForProject(projectId: string) {
     copyColumn,
     moveAllCards,
     archiveAllCards,
+    setBoardBackground,
+    archiveCard,
+    restoreCard,
+    deleteArchivedCard,
+    addActivity,
     labels: board.labels,
   };
 }
