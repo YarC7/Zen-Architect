@@ -142,6 +142,62 @@ function TimelineBar({
   );
 }
 
+function TimelineCardRow({
+  card,
+  pos,
+  statusStyle,
+  onCardClick,
+  minDate,
+  totalDays,
+  hoveredCardId,
+  setHoveredCardId,
+}: {
+  card: Card;
+  pos: { left: number; width: number };
+  statusStyle: { bg: string; text: string };
+  onCardClick: (card: Card) => void;
+  minDate: Date;
+  totalDays: number;
+  hoveredCardId: string | null;
+  setHoveredCardId: (id: string | null) => void;
+}) {
+  const { ref, isDropTarget } = useDroppable({
+    id: `timeline-row-${card.id}`,
+    data: { card, minDate },
+  });
+
+  return (
+    <div
+      ref={ref}
+      className={`relative border-b border-border/30 group transition-colors ${
+        hoveredCardId === card.id ? "bg-accent/50" : ""
+      } ${isDropTarget ? "bg-primary/10 ring-2 ring-inset ring-primary" : ""}`}
+      style={{ height: ROW_HEIGHT }}
+      onMouseEnter={() => setHoveredCardId(card.id)}
+      onMouseLeave={() => setHoveredCardId(null)}
+    >
+      {/* Grid lines for row */}
+      <div className="flex h-full absolute inset-0 pointer-events-none">
+        {Array.from({ length: totalDays }).map((_, i) => (
+          <div
+            key={i}
+            className="border-r border-border/10 h-full"
+            style={{ width: DAY_WIDTH }}
+          />
+        ))}
+      </div>
+
+      <TimelineBar
+        card={card}
+        pos={pos}
+        statusStyle={statusStyle}
+        onCardClick={onCardClick}
+        minDate={minDate}
+      />
+    </div>
+  );
+}
+
 function TimelineDropZone({
   children,
   totalDays,
@@ -149,7 +205,7 @@ function TimelineDropZone({
   children: React.ReactNode;
   totalDays: number;
 }) {
-  const { ref } = useDroppable({
+  const { ref, isDropTarget } = useDroppable({
     id: "timeline-drop-zone",
   });
 
@@ -157,7 +213,9 @@ function TimelineDropZone({
     <div
       ref={ref}
       style={{ width: totalDays * DAY_WIDTH, minHeight: "100%" }}
-      className="relative"
+      className={`relative transition-colors ${
+        isDropTarget ? "bg-primary/5 ring-2 ring-inset ring-primary" : ""
+      }`}
     >
       {children}
     </div>
@@ -514,44 +572,25 @@ export function TimelineView({
                         </div>
                       </div>
 
-                      {isExpanded &&
-                        colCards.map((card) => {
-                          const pos = getBarPosition(card);
-                          if (!pos) return null;
+                       {isExpanded &&
+                         colCards.map((card) => {
+                           const pos = getBarPosition(card);
+                           if (!pos) return null;
 
-                          return (
-                            <div
-                              key={card.id}
-                              className={`relative border-b border-border/30 group transition-colors ${
-                                hoveredCardId === card.id ? "bg-accent/50" : ""
-                              }`}
-                              style={{ height: ROW_HEIGHT }}
-                              onMouseEnter={() => setHoveredCardId(card.id)}
-                              onMouseLeave={() => setHoveredCardId(null)}
-                            >
-                              {/* Grid lines for row */}
-                              <div className="flex h-full absolute inset-0 pointer-events-none">
-                                {Array.from({ length: totalDays }).map(
-                                  (_, i) => (
-                                    <div
-                                      key={i}
-                                      className="border-r border-border/10 h-full"
-                                      style={{ width: DAY_WIDTH }}
-                                    />
-                                  ),
-                                )}
-                              </div>
-
-                              <TimelineBar
-                                card={card}
-                                pos={pos}
-                                statusStyle={statusStyle}
-                                onCardClick={onCardClick}
-                                minDate={minDate}
-                              />
-                            </div>
-                          );
-                        })}
+                           return (
+                             <TimelineCardRow
+                               key={card.id}
+                               card={card}
+                               pos={pos}
+                               statusStyle={statusStyle}
+                               onCardClick={onCardClick}
+                               minDate={minDate}
+                               totalDays={totalDays}
+                               hoveredCardId={hoveredCardId}
+                               setHoveredCardId={setHoveredCardId}
+                             />
+                           );
+                         })}
                     </div>
                   );
                 })}
