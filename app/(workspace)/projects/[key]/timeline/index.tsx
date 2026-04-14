@@ -38,7 +38,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, CheckCircle2, Circle } from "lucide-react";
 import { BoardState, Card } from "@/types/board";
 import { TimelineViewType } from "./types";
 import {
@@ -53,6 +53,12 @@ interface TimelineViewProps {
   board: BoardState;
   onCardClick: (card: Card) => void;
   onUpdateCard: (card: Card) => void;
+  onMoveCard: (
+    cardId: string,
+    fromColId: string,
+    toColId: string,
+    toIndex: number,
+  ) => void;
   viewType?: TimelineViewType;
   currentDate?: Date;
   onViewTypeChange?: (type: TimelineViewType) => void;
@@ -74,6 +80,7 @@ function getStatusStyle(colTitle: string) {
 
 const DAY_WIDTH = 40;
 const ROW_HEIGHT = 44;
+const SUBTASK_HEIGHT = 32;
 const HEADER_HEIGHT = 56;
 const SCOPE_WIDTH = 420;
 
@@ -92,7 +99,7 @@ function TimelineBar({
 }) {
   const { ref, isDragging, isDropping } = useDraggable({
     id: `timeline-bar-${card.id}`,
-    data: { card, minDate },
+    data: { card, minDate, type: "card" },
   });
 
   return (
@@ -235,6 +242,8 @@ function TimelineCardRow({
   totalDays,
   hoveredCardId,
   setHoveredCardId,
+  isExpanded,
+  onToggleExpand,
 }: {
   card: Card;
   pos: { left: number; width: number };
@@ -244,40 +253,72 @@ function TimelineCardRow({
   totalDays: number;
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
+  isExpanded: boolean;
+  onToggleExpand: (cardId: string) => void;
 }) {
   const { ref, isDropTarget } = useDroppable({
     id: `timeline-row-${card.id}`,
-    data: { card, minDate },
+    data: { card, minDate, type: "row" },
   });
 
   return (
     <div
       ref={ref}
-      className={`relative border-b border-border/30 group transition-colors ${
+      className={`relative group transition-all ${
         hoveredCardId === card.id ? "bg-accent/50" : ""
       } ${isDropTarget ? "bg-primary/10 ring-2 ring-inset ring-primary" : ""}`}
-      style={{ height: ROW_HEIGHT }}
       onMouseEnter={() => setHoveredCardId(card.id)}
       onMouseLeave={() => setHoveredCardId(null)}
     >
-      {/* Grid lines for row */}
-      <div className="flex h-full absolute inset-0 pointer-events-none">
-        {Array.from({ length: totalDays }).map((_, i) => (
-          <div
-            key={i}
-            className="border-r border-border/10 h-full"
-            style={{ width: DAY_WIDTH }}
-          />
-        ))}
+      <div style={{ minHeight: ROW_HEIGHT }} className="relative">
+        {/* Grid lines for row */}
+        <div className="flex h-full absolute inset-0 pointer-events-none">
+          {Array.from({ length: totalDays }).map((_, i) => (
+            <div
+              key={i}
+              className="border-r border-border/10 h-full"
+              style={{ width: DAY_WIDTH }}
+            />
+          ))}
+        </div>
+
+        <TimelineBar
+          card={card}
+          pos={pos}
+          statusStyle={statusStyle}
+          onCardClick={onCardClick}
+          minDate={minDate}
+        />
       </div>
 
-      <TimelineBar
-        card={card}
-        pos={pos}
-        statusStyle={statusStyle}
-        onCardClick={onCardClick}
-        minDate={minDate}
-      />
+      {isExpanded && card.checklist.length > 0 && (
+        <div className="bg-muted/5">
+          {card.checklist.map((item) => (
+            <div
+              key={item.id}
+              style={{ height: SUBTASK_HEIGHT }}
+              className="relative border-t border-border/10"
+            >
+              {/* Grid lines for subtask */}
+              <div className="flex h-full absolute inset-0 pointer-events-none">
+                {Array.from({ length: totalDays }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="border-r border-border/5 h-full"
+                    style={{ width: DAY_WIDTH }}
+                  />
+                ))}
+              </div>
+
+              {/* Optional: Subtask bar representation if start/due dates are added to ChecklistItem in future */}
+              {/* For now just show item title in grid if within date range? 
+                  The request said "hiển thị todo của issue đó ở dưới", usually subtasks share parent date range in timeline or have their own.
+                  Since ChecklistItem doesn't have dates, we'll just show them in the scope panel for now.
+              */}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -310,6 +351,7 @@ export function TimelineView({
   board,
   onCardClick,
   onUpdateCard,
+  onMoveCard,
   viewType = "month",
   currentDate = new Date(),
   onViewTypeChange,
@@ -318,6 +360,7 @@ export function TimelineView({
   const [expandedCols, setExpandedCols] = useState<Set<string>>(
     () => new Set(board.columns.map((c) => c.id)),
   );
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   const manager = useMemo(
     () =>
@@ -431,6 +474,15 @@ export function TimelineView({
     });
   };
 
+  const toggleCard = (cardId: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(cardId)) next.delete(cardId);
+      else next.add(cardId);
+      return next;
+    });
+  };
+
   const getBarPosition = (card: Card) => {
     if (!card.startDate && !card.dueDate) return null;
     const start = card.startDate
@@ -482,15 +534,44 @@ export function TimelineView({
     }
   }, []);
 
+  const handleLeftPanelScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = e.currentTarget.scrollTop;
+      }
+    },
+    [],
+  );
+
   const handleDragEnd = useCallback(
     (event: any) => {
       const { operation } = event;
-      const { source, transform } = operation;
+      const { source, transform, target } = operation;
       if (!source || !source.data || !source.data.card) return;
 
       const card = source.data.card as Card;
-      const daysShift = Math.round(transform.x / DAY_WIDTH);
 
+      // Handle dragging onto a different row/status
+      if (target && target.id.startsWith("timeline-row-")) {
+        const targetCard = target.data.card as Card;
+        if (targetCard.id !== card.id) {
+          const fromCol = board.columns.find((col) =>
+            col.cardIds.includes(card.id),
+          );
+          const toCol = board.columns.find((col) =>
+            col.cardIds.includes(targetCard.id),
+          );
+
+          if (fromCol && toCol) {
+            const targetIndex = toCol.cardIds.indexOf(targetCard.id);
+            onMoveCard(card.id, fromCol.id, toCol.id, targetIndex);
+            // After moving, we don't return, as we might also want to update the time
+          }
+        }
+      }
+
+      // Handle time shift
+      const daysShift = Math.round(transform.x / DAY_WIDTH);
       if (daysShift !== 0) {
         const newStart = card.startDate
           ? addDays(new Date(card.startDate), daysShift)
@@ -506,7 +587,7 @@ export function TimelineView({
         });
       }
     },
-    [onUpdateCard],
+    [onUpdateCard, onMoveCard, board.columns],
   );
 
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
@@ -514,7 +595,7 @@ export function TimelineView({
 
   return (
     <DragDropProvider manager={manager} onDragEnd={handleDragEnd}>
-      <div className="flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-card h-full font-sans">
+      <div className="flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-card h-full font-sans ">
         {onViewTypeChange && onDateChange && (
           <div className="px-4 pt-4">
             <TimelineHeader
@@ -541,7 +622,11 @@ export function TimelineView({
               <span className="w-24 text-center">Status</span>
             </div>
             {/* Rows */}
-            <div className="overflow-hidden flex-1" ref={leftPanelRef}>
+            <div
+              className="overflow-y-auto flex-1 min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              ref={leftPanelRef}
+              onScroll={handleLeftPanelScroll}
+            >
               {board.columns.map((col) => {
                 const isExpanded = expandedCols.has(col.id);
                 const colCards = col.cardIds
@@ -583,49 +668,97 @@ export function TimelineView({
                       </Badge>
                     </div>
                     {isExpanded &&
-                      colCards.map((card) => (
-                        <div
-                          key={card.id}
-                          className={`flex items-center gap-2 px-3 border-b border-border/50 cursor-pointer transition-colors ${
-                            hoveredCardId === card.id ? "bg-accent/50" : ""
-                          }`}
-                          style={{ height: ROW_HEIGHT }}
-                          onClick={() => onCardClick(card)}
-                          onMouseEnter={() => setHoveredCardId(card.id)}
-                          onMouseLeave={() => setHoveredCardId(null)}
-                        >
-                          <span className="text-xs text-muted-foreground w-8 pl-4" />
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            {card.labels.length > 0 && (
-                              <div
-                                className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                style={{
-                                  backgroundColor: `hsl(${card.labels[0].color})`,
-                                }}
-                              >
-                                <span className="text-[8px] font-bold text-white">
-                                  {card.labels[0].name.charAt(0)}
+                      colCards.map((card) => {
+                        const isCardExpanded = expandedCards.has(card.id);
+                        return (
+                          <div key={card.id}>
+                            <div
+                              className={`flex items-center gap-2 px-3 border-b border-border/50 cursor-pointer transition-colors ${
+                                hoveredCardId === card.id ? "bg-accent/50" : ""
+                              }`}
+                              style={{ height: ROW_HEIGHT }}
+                              onClick={() => onCardClick(card)}
+                              onMouseEnter={() => setHoveredCardId(card.id)}
+                              onMouseLeave={() => setHoveredCardId(null)}
+                            >
+                              <div className="w-8 pl-4 flex items-center shrink-0">
+                                {card.checklist.length > 0 && (
+                                  <button
+                                    className="p-0.5 hover:bg-accent rounded"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleCard(card.id);
+                                    }}
+                                  >
+                                    {isCardExpanded ? (
+                                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {card.labels.length > 0 && (
+                                  <div
+                                    className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                    style={{
+                                      backgroundColor: `hsl(${card.labels[0].color})`,
+                                    }}
+                                  >
+                                    <span className="text-[8px] font-bold text-white">
+                                      {card.labels[0].name.charAt(0)}
+                                    </span>
+                                  </div>
+                                )}
+                                <span className="text-sm truncate font-medium">
+                                  {card.title}
                                 </span>
                               </div>
-                            )}
-                            <span className="text-sm truncate">
-                              {card.title}
-                            </span>
+                              <Badge
+                                className="text-[10px] h-5 px-1.5 font-bold uppercase shrink-0"
+                                style={{
+                                  backgroundColor: colStatusStyle.bg,
+                                  color: colStatusStyle.text,
+                                }}
+                              >
+                                {col.title}
+                              </Badge>
+                            </div>
+
+                            {isCardExpanded &&
+                              card.checklist.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="flex items-center gap-2 px-3 border-b border-border/20 bg-muted/5"
+                                  style={{ height: SUBTASK_HEIGHT }}
+                                >
+                                  <span className="w-12 shrink-0" />
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    {item.checked ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                    ) : (
+                                      <Circle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                    )}
+                                    <span
+                                      className={`text-xs truncate ${item.checked ? "text-muted-foreground line-through" : ""}`}
+                                    >
+                                      {item.text}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
                           </div>
-                          <Badge
-                            className="text-[10px] h-5 px-1.5 font-bold uppercase shrink-0"
-                            style={{
-                              backgroundColor: colStatusStyle.bg,
-                              color: colStatusStyle.text,
-                            }}
-                          >
-                            {col.title}
-                          </Badge>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 );
               })}
+              {/* Extra spacer to account for horizontal scrollbar in timeline panel */}
+              <div
+                style={{ height: 20 }}
+                className="flex-none bg-transparent"
+              />
             </div>
           </div>
 
@@ -745,6 +878,8 @@ export function TimelineView({
                               totalDays={totalDays}
                               hoveredCardId={hoveredCardId}
                               setHoveredCardId={setHoveredCardId}
+                              isExpanded={expandedCards.has(card.id)}
+                              onToggleExpand={toggleCard}
                             />
                           );
                         })}

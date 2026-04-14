@@ -61,6 +61,7 @@ export default function ProjectDetail() {
     addCard,
     updateCard,
     deleteCard,
+    moveCard,
     addAssignee,
     addLabel,
     updateLabel,
@@ -459,11 +460,12 @@ export default function ProjectDetail() {
       )}
 
       {activeView === "timeline" && (
-        <div className="flex-1 overflow-hidden p-4 h-[calc(100vh-64px)]">
+        <div className="flex-1 overflow-hidden p-4 h-[calc(100vh-96px)]">
           <TimelineView
             board={board}
             onCardClick={openCard}
             onUpdateCard={updateCard}
+            onMoveCard={moveCard}
             viewType={timelineViewType as TimelineViewType}
             currentDate={timelineCurrentDate}
             onViewTypeChange={(type) =>

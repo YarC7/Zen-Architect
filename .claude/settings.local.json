@@ -6,7 +6,8 @@
       "Bash(ls:*)",
       "Bash(pnpm tsc:*)",
       "Bash(pnpm build:*)",
-      "Skill(gsd:execute-phase)"
+      "Skill(gsd:execute-phase)",
+      "Skill(gsd:debug)"
     ]
   }
 }
