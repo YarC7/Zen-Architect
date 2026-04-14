@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
   useCallback,
-  useEffect,
 } from "react";
 import {
   format,
@@ -71,24 +70,16 @@ function TimelineBar({
   onCardClick: (card: Card) => void;
   minDate: Date;
 }) {
-  const { handleRef, isDragging } = useDraggable({
+  const { ref, isDragging } = useDraggable({
     id: `timeline-bar-${card.id}`,
     data: { card, minDate },
   });
-
-  const divRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (divRef.current) {
-      handleRef(divRef.current);
-    }
-  }, [handleRef]);
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
-          ref={divRef}
+          ref={ref}
           className={`absolute top-2 rounded-md cursor-pointer hover:brightness-110 shadow-sm flex items-center px-2 overflow-hidden z-5 ${
             isDragging
               ? "opacity-60 z-50 cursor-grabbing shadow-lg"

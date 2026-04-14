@@ -183,13 +183,19 @@ export default function ProjectDetail() {
     : null;
 
   const hasFilter = Boolean(filterLabel || filterAssignee);
-  const archivedCount = board.archivedCards ? Object.keys(board.archivedCards).length : 0;
+  const archivedCount = board.archivedCards
+    ? Object.keys(board.archivedCards).length
+    : 0;
 
   // Get background style
   const backgroundStyle = useMemo(() => {
     if (!board.background) return {};
     if (board.background.type === "image") {
-      return { backgroundImage: `url(${board.background.value})`, backgroundSize: "cover", backgroundPosition: "center" };
+      return {
+        backgroundImage: `url(${board.background.value})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
     }
     if (board.background.type === "gradient") {
       return { background: board.background.value };
@@ -441,9 +447,9 @@ export default function ProjectDetail() {
       )}
 
       {activeView === "timeline" && (
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 overflow-hidden p-4 h-[calc(100vh-140px)]">
           <TimelineView
-            cards={allCards}
+            board={board}
             onCardClick={openCard}
             onUpdateCard={updateCard}
           />
