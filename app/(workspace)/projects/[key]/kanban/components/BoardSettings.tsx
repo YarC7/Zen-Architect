@@ -196,10 +196,10 @@ export function BoardSettings({
                 size="sm"
                 onClick={() => {
                   setBgType("gradient");
-                  onBackgroundChange({
-                    type: "gradient",
-                    value: GRADIENT_PRESETS[0],
-                  });
+                  // onBackgroundChange({
+                  //   type: "gradient",
+                  //   value: GRADIENT_PRESETS[0],
+                  // });
                 }}
               >
                 <Sparkles className="h-4 w-4 mr-1" /> Gradient

@@ -1,235 +1,264 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   BoardState,
   Card,
   ASSIGNEE_COLORS,
-  DEFAULT_BOARD,
   BoardBackground,
   Activity,
 } from "@/types/board";
-import { loadBoardForProject, saveBoardForProject } from "./useProjects";
+import { useBoardQuery, useUpdateBoardMutation } from "./useTanstackQuery";
 
 let idCounter = Date.now();
 function genId(prefix: string) {
   return `${prefix}-${++idCounter}`;
 }
 
-function normalizeBoard(state: BoardState): BoardState {
-  return {
-    ...state,
-    labels: state.labels ?? DEFAULT_BOARD.labels,
-    background: state.background ?? DEFAULT_BOARD.background,
-    archivedCards: state.archivedCards ?? {},
-    activities: state.activities ?? [],
-  };
-}
-
 export function useBoardForProject(projectId: string) {
-  const [board, setBoard] = useState<BoardState>(() =>
-    normalizeBoard(loadBoardForProject(projectId)),
+  const { data: board, isLoading } = useBoardQuery(projectId);
+  const updateBoardMutation = useUpdateBoardMutation(projectId);
+
+  const setBoard = useCallback(
+    (updater: BoardState | ((prev: BoardState) => BoardState)) => {
+      if (!board) return;
+      const nextBoard =
+        typeof updater === "function" ? updater(board) : updater;
+      updateBoardMutation.mutate(nextBoard);
+    },
+    [board, updateBoardMutation],
   );
 
-  // Reload when projectId changes
-  useEffect(() => {
-    setBoard(normalizeBoard(loadBoardForProject(projectId)));
-  }, [projectId]);
+  const setBoardTitle = useCallback(
+    (title: string) => {
+      setBoard((prev) => ({ ...prev, title }));
+    },
+    [setBoard],
+  );
 
-  useEffect(() => {
-    saveBoardForProject(projectId, board);
-  }, [projectId, board]);
-
-  const setBoardTitle = useCallback((title: string) => {
-    setBoard((prev) => ({ ...prev, title }));
-  }, []);
-
-  const addColumn = useCallback((title: string) => {
-    const colors = [
-      "199 89% 48%",
-      "25 95% 53%",
-      "262 83% 58%",
-      "142 71% 45%",
-      "330 81% 60%",
-    ];
-    setBoard((prev) => ({
-      ...prev,
-      columns: [
-        ...prev.columns,
-        {
-          id: genId("col"),
-          title,
-          color: colors[prev.columns.length % colors.length],
-          cardIds: [],
-        },
-      ],
-    }));
-  }, []);
-
-  const renameColumn = useCallback((colId: string, title: string) => {
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((c) => (c.id === colId ? { ...c, title } : c)),
-    }));
-  }, []);
-
-  const setColumnColor = useCallback((colId: string, color: string) => {
-    setBoard((prev) => ({
-      ...prev,
-      columns: prev.columns.map((c) => (c.id === colId ? { ...c, color } : c)),
-    }));
-  }, []);
-
-  const copyColumn = useCallback((colId: string) => {
-    setBoard((prev) => {
-      const col = prev.columns.find((c) => c.id === colId);
-      if (!col) return prev;
-
-      const newColId = genId("col");
-      const newCardIds: string[] = [];
-      const newCards = { ...prev.cards };
-
-      col.cardIds.forEach((cardId) => {
-        const card = prev.cards[cardId];
-        if (card) {
-          const newCardId = genId("card");
-          newCardIds.push(newCardId);
-          newCards[newCardId] = { ...card, id: newCardId };
-        }
-      });
-
-      const newColumn = {
-        ...col,
-        id: newColId,
-        title: `${col.title} (Copy)`,
-        cardIds: newCardIds,
-      };
-
-      const colIndex = prev.columns.findIndex((c) => c.id === colId);
-      const newColumns = [...prev.columns];
-      newColumns.splice(colIndex + 1, 0, newColumn);
-
-      return {
+  const addColumn = useCallback(
+    (title: string) => {
+      const colors = [
+        "199 89% 48%",
+        "25 95% 53%",
+        "262 83% 58%",
+        "142 71% 45%",
+        "330 81% 60%",
+      ];
+      setBoard((prev) => ({
         ...prev,
-        columns: newColumns,
-        cards: newCards,
-      };
-    });
-  }, []);
+        columns: [
+          ...prev.columns,
+          {
+            id: genId("col"),
+            title,
+            color: colors[prev.columns.length % colors.length],
+            cardIds: [],
+          },
+        ],
+      }));
+    },
+    [setBoard],
+  );
 
-  const moveAllCards = useCallback((fromColId: string, toColId: string) => {
-    setBoard((prev) => {
-      const fromCol = prev.columns.find((c) => c.id === fromColId);
-      if (!fromCol || fromColId === toColId) return prev;
-
-      return {
-        ...prev,
-        columns: prev.columns.map((col) => {
-          if (col.id === fromColId) {
-            return { ...col, cardIds: [] };
-          }
-          if (col.id === toColId) {
-            return { ...col, cardIds: [...col.cardIds, ...fromCol.cardIds] };
-          }
-          return col;
-        }),
-      };
-    });
-  }, []);
-
-  const archiveAllCards = useCallback((colId: string) => {
-    setBoard((prev) => {
-      const col = prev.columns.find((c) => c.id === colId);
-      if (!col) return prev;
-
-      const newCards = { ...prev.cards };
-      col.cardIds.forEach((id) => delete newCards[id]);
-
-      return {
+  const renameColumn = useCallback(
+    (colId: string, title: string) => {
+      setBoard((prev) => ({
         ...prev,
         columns: prev.columns.map((c) =>
-          c.id === colId ? { ...c, cardIds: [] } : c,
+          c.id === colId ? { ...c, title } : c,
         ),
-        cards: newCards,
-      };
-    });
-  }, []);
+      }));
+    },
+    [setBoard],
+  );
 
-  const deleteColumn = useCallback((colId: string) => {
-    setBoard((prev) => {
-      const col = prev.columns.find((c) => c.id === colId);
-      const newCards = { ...prev.cards };
-      col?.cardIds.forEach((id) => delete newCards[id]);
-      return {
+  const setColumnColor = useCallback(
+    (colId: string, color: string) => {
+      setBoard((prev) => ({
         ...prev,
-        columns: prev.columns.filter((c) => c.id !== colId),
-        cards: newCards,
+        columns: prev.columns.map((c) =>
+          c.id === colId ? { ...c, color } : c,
+        ),
+      }));
+    },
+    [setBoard],
+  );
+
+  const copyColumn = useCallback(
+    (colId: string) => {
+      setBoard((prev) => {
+        const col = prev.columns.find((c) => c.id === colId);
+        if (!col) return prev;
+
+        const newColId = genId("col");
+        const newCardIds: string[] = [];
+        const newCards = { ...prev.cards };
+
+        col.cardIds.forEach((cardId) => {
+          const card = prev.cards[cardId];
+          if (card) {
+            const newCardId = genId("card");
+            newCardIds.push(newCardId);
+            newCards[newCardId] = { ...card, id: newCardId };
+          }
+        });
+
+        const newColumn = {
+          ...col,
+          id: newColId,
+          title: `${col.title} (Copy)`,
+          cardIds: newCardIds,
+        };
+
+        const colIndex = prev.columns.findIndex((c) => c.id === colId);
+        const newColumns = [...prev.columns];
+        newColumns.splice(colIndex + 1, 0, newColumn);
+
+        return {
+          ...prev,
+          columns: newColumns,
+          cards: newCards,
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const moveAllCards = useCallback(
+    (fromColId: string, toColId: string) => {
+      setBoard((prev) => {
+        const fromCol = prev.columns.find((c) => c.id === fromColId);
+        if (!fromCol || fromColId === toColId) return prev;
+
+        return {
+          ...prev,
+          columns: prev.columns.map((col) => {
+            if (col.id === fromColId) {
+              return { ...col, cardIds: [] };
+            }
+            if (col.id === toColId) {
+              return { ...col, cardIds: [...col.cardIds, ...fromCol.cardIds] };
+            }
+            return col;
+          }),
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const archiveAllCards = useCallback(
+    (colId: string) => {
+      setBoard((prev) => {
+        const col = prev.columns.find((c) => c.id === colId);
+        if (!col) return prev;
+
+        const newCards = { ...prev.cards };
+        col.cardIds.forEach((id) => delete newCards[id]);
+
+        return {
+          ...prev,
+          columns: prev.columns.map((c) =>
+            c.id === colId ? { ...c, cardIds: [] } : c,
+          ),
+          cards: newCards,
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const deleteColumn = useCallback(
+    (colId: string) => {
+      setBoard((prev) => {
+        const col = prev.columns.find((c) => c.id === colId);
+        const newCards = { ...prev.cards };
+        col?.cardIds.forEach((id) => delete newCards[id]);
+        return {
+          ...prev,
+          columns: prev.columns.filter((c) => c.id !== colId),
+          cards: newCards,
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const addCard = useCallback(
+    (colId: string, title: string) => {
+      const cardId = genId("card");
+      const card: Card = {
+        id: cardId,
+        title,
+        description: "",
+        labels: [],
+        dueDate: null,
+        startDate: null,
+        dueTime: null,
+        startTime: null,
+        assignees: [],
+        checklist: [],
+        completed: false,
       };
-    });
-  }, []);
-
-  const addCard = useCallback((colId: string, title: string) => {
-    const cardId = genId("card");
-    const card: Card = {
-      id: cardId,
-      title,
-      description: "",
-      labels: [],
-      dueDate: null,
-      startDate: null,
-      dueTime: null,
-      startTime: null,
-      assignees: [],
-      checklist: [],
-      completed: false,
-    };
-    setBoard((prev) => ({
-      ...prev,
-      cards: { ...prev.cards, [cardId]: card },
-      columns: prev.columns.map((c) =>
-        c.id === colId ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
-      ),
-    }));
-  }, []);
-
-  const updateCard = useCallback((card: Card) => {
-    setBoard((prev) => ({
-      ...prev,
-      cards: { ...prev.cards, [card.id]: card },
-    }));
-  }, []);
-
-  const deleteCard = useCallback((cardId: string) => {
-    setBoard((prev) => {
-      const newCards = { ...prev.cards };
-      delete newCards[cardId];
-      return {
+      setBoard((prev) => ({
         ...prev,
-        cards: newCards,
-        columns: prev.columns.map((c) => ({
-          ...c,
-          cardIds: c.cardIds.filter((id) => id !== cardId),
-        })),
-      };
-    });
-  }, []);
+        cards: { ...prev.cards, [cardId]: card },
+        columns: prev.columns.map((c) =>
+          c.id === colId ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
+        ),
+      }));
+    },
+    [setBoard],
+  );
 
-  const addAssignee = useCallback((cardId: string, name: string) => {
-    setBoard((prev) => {
-      const card = prev.cards[cardId];
-      if (!card) return prev;
-      const color =
-        ASSIGNEE_COLORS[card.assignees.length % ASSIGNEE_COLORS.length];
-      return {
+  const updateCard = useCallback(
+    (card: Card) => {
+      setBoard((prev) => ({
         ...prev,
-        cards: {
-          ...prev.cards,
-          [cardId]: {
-            ...card,
-            assignees: [...card.assignees, { id: genId("a"), name, color }],
+        cards: { ...prev.cards, [card.id]: card },
+      }));
+    },
+    [setBoard],
+  );
+
+  const deleteCard = useCallback(
+    (cardId: string) => {
+      setBoard((prev) => {
+        const newCards = { ...prev.cards };
+        delete newCards[cardId];
+        return {
+          ...prev,
+          cards: newCards,
+          columns: prev.columns.map((c) => ({
+            ...c,
+            cardIds: c.cardIds.filter((id) => id !== cardId),
+          })),
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const addAssignee = useCallback(
+    (cardId: string, name: string) => {
+      setBoard((prev) => {
+        const card = prev.cards[cardId];
+        if (!card) return prev;
+        const color =
+          ASSIGNEE_COLORS[card.assignees.length % ASSIGNEE_COLORS.length];
+        return {
+          ...prev,
+          cards: {
+            ...prev.cards,
+            [cardId]: {
+              ...card,
+              assignees: [...card.assignees, { id: genId("a"), name, color }],
+            },
           },
-        },
-      };
-    });
-  }, []);
+        };
+      });
+    },
+    [setBoard],
+  );
 
   const moveCard = useCallback(
     (cardId: string, fromColId: string, toColId: string, toIndex: number) => {
@@ -253,143 +282,173 @@ export function useBoardForProject(projectId: string) {
         return { ...prev, columns };
       });
     },
-    [],
+    [setBoard],
   );
 
-  const reorderColumns = useCallback((fromIndex: number, toIndex: number) => {
-    setBoard((prev) => {
-      const cols = [...prev.columns];
-      const [moved] = cols.splice(fromIndex, 1);
-      cols.splice(toIndex, 0, moved);
-      return { ...prev, columns: cols };
-    });
-  }, []);
-
-  const addLabel = useCallback((name: string, color: string) => {
-    const id = genId("label");
-    setBoard((prev) => ({
-      ...prev,
-      labels: [...(prev.labels || []), { id, name, color }],
-    }));
-    return id;
-  }, []);
-
-  const updateLabel = useCallback((id: string, name: string, color: string) => {
-    const updatedLabel = { id, name, color };
-    setBoard((prev) => {
-      const newLabels = (prev.labels || []).map((l) =>
-        l.id === id ? updatedLabel : l,
-      );
-      const newCards = { ...prev.cards };
-      Object.keys(newCards).forEach((cardId) => {
-        const card = newCards[cardId];
-        if (card.labels?.some((l) => l.id === id)) {
-          newCards[cardId] = {
-            ...card,
-            labels: card.labels.map((l) => (l.id === id ? updatedLabel : l)),
-          };
-        }
+  const reorderColumns = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setBoard((prev) => {
+        const cols = [...prev.columns];
+        const [moved] = cols.splice(fromIndex, 1);
+        cols.splice(toIndex, 0, moved);
+        return { ...prev, columns: cols };
       });
-      return { ...prev, labels: newLabels, cards: newCards };
-    });
-  }, []);
+    },
+    [setBoard],
+  );
 
-  const deleteLabel = useCallback((labelId: string) => {
-    setBoard((prev) => {
-      const newLabels = (prev.labels || []).filter((l) => l.id !== labelId);
-      const newCards = { ...prev.cards };
-      Object.keys(newCards).forEach((cardId) => {
-        const card = newCards[cardId];
-        if (card.labels?.some((l) => l.id === labelId)) {
-          newCards[cardId] = {
-            ...card,
-            labels: card.labels.filter((l) => l.id !== labelId),
-          };
-        }
+  const addLabel = useCallback(
+    (name: string, color: string) => {
+      const id = genId("label");
+      setBoard((prev) => ({
+        ...prev,
+        labels: [...(prev.labels || []), { id, name, color }],
+      }));
+      return id;
+    },
+    [setBoard],
+  );
+
+  const updateLabel = useCallback(
+    (id: string, name: string, color: string) => {
+      const updatedLabel = { id, name, color };
+      setBoard((prev) => {
+        const newLabels = (prev.labels || []).map((l) =>
+          l.id === id ? updatedLabel : l,
+        );
+        const newCards = { ...prev.cards };
+        Object.keys(newCards).forEach((cardId) => {
+          const card = newCards[cardId];
+          if (card.labels?.some((l) => l.id === id)) {
+            newCards[cardId] = {
+              ...card,
+              labels: card.labels.map((l) => (l.id === id ? updatedLabel : l)),
+            };
+          }
+        });
+        return { ...prev, labels: newLabels, cards: newCards };
       });
-      return { ...prev, labels: newLabels, cards: newCards };
-    });
-  }, []);
+    },
+    [setBoard],
+  );
 
-  const setBoardBackground = useCallback((background: BoardBackground) => {
-    setBoard((prev) => ({ ...prev, background }));
-  }, []);
+  const deleteLabel = useCallback(
+    (labelId: string) => {
+      setBoard((prev) => {
+        const newLabels = (prev.labels || []).filter((l) => l.id !== labelId);
+        const newCards = { ...prev.cards };
+        Object.keys(newCards).forEach((cardId) => {
+          const card = newCards[cardId];
+          if (card.labels?.some((l) => l.id === labelId)) {
+            newCards[cardId] = {
+              ...card,
+              labels: card.labels.filter((l) => l.id !== labelId),
+            };
+          }
+        });
+        return { ...prev, labels: newLabels, cards: newCards };
+      });
+    },
+    [setBoard],
+  );
 
-  const archiveCard = useCallback((cardId: string) => {
-    setBoard((prev) => {
-      const card = prev.cards[cardId];
-      if (!card) return prev;
-      const { [cardId]: _, ...remainingCards } = prev.cards;
-      const activity: Activity = {
-        id: genId("activity"),
-        type: "delete",
-        user: "User",
-        description: `Archived card "${card.title}"`,
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...prev,
-        cards: remainingCards,
-        archivedCards: { ...prev.archivedCards, [cardId]: card },
-        activities: [...prev.activities, activity],
-        columns: prev.columns.map((c) => ({
-          ...c,
-          cardIds: c.cardIds.filter((id) => id !== cardId),
-        })),
-      };
-    });
-  }, []);
+  const setBoardBackground = useCallback(
+    (background: BoardBackground) => {
+      setBoard((prev) => ({ ...prev, background }));
+    },
+    [setBoard],
+  );
 
-  const restoreCard = useCallback((cardId: string) => {
-    setBoard((prev) => {
-      const card = prev.archivedCards[cardId];
-      if (!card) return prev;
-      const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
-      const firstColumn = prev.columns[0];
-      const activity: Activity = {
-        id: genId("activity"),
-        type: "create",
-        user: "User",
-        description: `Restored card "${card.title}"`,
-        createdAt: new Date().toISOString(),
-      };
-      return {
-        ...prev,
-        cards: { ...prev.cards, [cardId]: card },
-        archivedCards: remainingArchived,
-        activities: [...prev.activities, activity],
-        columns: firstColumn
-          ? prev.columns.map((c, i) =>
-              i === 0 ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
-            )
-          : prev.columns,
-      };
-    });
-  }, []);
-
-  const deleteArchivedCard = useCallback((cardId: string) => {
-    setBoard((prev) => {
-      const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
-      return { ...prev, archivedCards: remainingArchived };
-    });
-  }, []);
-
-  const addActivity = useCallback((activity: Omit<Activity, "id" | "createdAt">) => {
-    setBoard((prev) => ({
-      ...prev,
-      activities: [
-        ...prev.activities,
-        {
-          ...activity,
+  const archiveCard = useCallback(
+    (cardId: string) => {
+      setBoard((prev) => {
+        const card = prev.cards[cardId];
+        if (!card) return prev;
+        const { [cardId]: _, ...remainingCards } = prev.cards;
+        const activity: Activity = {
           id: genId("activity"),
+          type: "delete",
+          user: "User",
+          description: `Archived card "${card.title}"`,
           createdAt: new Date().toISOString(),
-        },
-      ],
-    }));
-  }, []);
+        };
+        return {
+          ...prev,
+          cards: remainingCards,
+          archivedCards: { ...prev.archivedCards, [cardId]: card },
+          activities: [...prev.activities, activity],
+          columns: prev.columns.map((c) => ({
+            ...c,
+            cardIds: c.cardIds.filter((id) => id !== cardId),
+          })),
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const restoreCard = useCallback(
+    (cardId: string) => {
+      setBoard((prev) => {
+        const card = prev.archivedCards[cardId];
+        if (!card) return prev;
+        const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
+        const firstColumn = prev.columns[0];
+        const activity: Activity = {
+          id: genId("activity"),
+          type: "create",
+          user: "User",
+          description: `Restored card "${card.title}"`,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...prev,
+          cards: { ...prev.cards, [cardId]: card },
+          archivedCards: remainingArchived,
+          activities: [...prev.activities, activity],
+          columns: firstColumn
+            ? prev.columns.map((c, i) =>
+                i === 0 ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
+              )
+            : prev.columns,
+        };
+      });
+    },
+    [setBoard],
+  );
+
+  const deleteArchivedCard = useCallback(
+    (cardId: string) => {
+      setBoard((prev) => {
+        const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
+        return { ...prev, archivedCards: remainingArchived };
+      });
+    },
+    [setBoard],
+  );
+
+  const addActivity = useCallback(
+    (activity: Omit<Activity, "id" | "createdAt">) => {
+      setBoard((prev) => ({
+        ...prev,
+        activities: [
+          ...prev.activities,
+          {
+            ...activity,
+            id: genId("activity"),
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }));
+    },
+    [setBoard],
+  );
+
+  const labels = useMemo(() => board?.labels || [], [board?.labels]);
 
   return {
-    board,
+    board: board!,
+    isLoading,
     setBoard,
     setBoardTitle,
     addColumn,
@@ -413,6 +472,6 @@ export function useBoardForProject(projectId: string) {
     restoreCard,
     deleteArchivedCard,
     addActivity,
-    labels: board.labels,
+    labels,
   };
 }

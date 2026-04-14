@@ -44,11 +44,14 @@ import {
   PointerActivationConstraints,
 } from "@dnd-kit/dom";
 export default function ProjectDetail() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ key: string }>();
+  const id = params?.key;
   const router = useRouter();
 
   const {
     board,
+    isLoading,
+
     setBoard,
     setBoardTitle,
     setColumnColor,
@@ -71,7 +74,7 @@ export default function ProjectDetail() {
     restoreCard,
     deleteArchivedCard,
     addActivity,
-  } = useBoardForProject(id!);
+  } = useBoardForProject(id || "");
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,17 +111,18 @@ export default function ProjectDetail() {
   );
 
   const allAssignees = useMemo(() => {
+    if (!board) return [];
     const map = new Map<string, Assignee>();
     Object.values(board.cards).forEach((c) =>
       c.assignees.forEach((a) => map.set(a.name, a)),
     );
     return Array.from(map.values());
-  }, [board.cards]);
+  }, [board]);
 
   const handleDragOver = useCallback(
     (event: any) => {
       const { source, target } = event.operation;
-      if (!source || !target) return;
+      if (!source || !target || !board) return;
       if (source.type !== "item") return;
 
       setBoard((prev) => {
@@ -144,13 +148,13 @@ export default function ProjectDetail() {
         };
       });
     },
-    [setBoard],
+    [board, setBoard],
   );
 
   const handleDragEnd = useCallback(
     (event: any) => {
       const { canceled, source, target } = event.operation;
-      if (canceled || !source || !target) return;
+      if (canceled || !source || !target || !board) return;
 
       if (source.type === "column" && target.type === "column") {
         setBoard((prev) => {
@@ -165,7 +169,7 @@ export default function ProjectDetail() {
         });
       }
     },
-    [setBoard],
+    [board, setBoard],
   );
 
   const openCard = (card: Card) => {
@@ -175,6 +179,7 @@ export default function ProjectDetail() {
 
   const filteredCardIds = useCallback(
     (cardIds: string[]) => {
+      if (!board) return [];
       return cardIds.filter((id) => {
         const card = board.cards[id];
         if (!card) return false;
@@ -188,21 +193,20 @@ export default function ProjectDetail() {
         return true;
       });
     },
-    [board.cards, filterLabel, filterAssignee],
+    [board, filterLabel, filterAssignee],
   );
 
-  const liveSelectedCard = selectedCard
-    ? board.cards[selectedCard.id] || null
-    : null;
+  const liveSelectedCard =
+    selectedCard && board ? board.cards[selectedCard.id] || null : null;
 
   const hasFilter = Boolean(filterLabel || filterAssignee);
-  const archivedCount = board.archivedCards
+  const archivedCount = board?.archivedCards
     ? Object.keys(board.archivedCards).length
     : 0;
 
   // Get background style
   const backgroundStyle = useMemo(() => {
-    if (!board.background) return {};
+    if (!board?.background) return {};
     if (board.background.type === "image") {
       return {
         backgroundImage: `url(${board.background.value})`,
@@ -214,9 +218,10 @@ export default function ProjectDetail() {
       return { background: board.background.value };
     }
     return { backgroundColor: board.background.value };
-  }, [board.background]);
+  }, [board]);
 
   const allCards = useMemo(() => {
+    if (!board) return [];
     const cards: Card[] = [];
     board.columns.forEach((col) => {
       filteredCardIds(col.cardIds).forEach((id) => {
@@ -226,6 +231,14 @@ export default function ProjectDetail() {
     });
     return cards;
   }, [board, filteredCardIds]);
+
+  if (isLoading || !board) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col" style={backgroundStyle}>
