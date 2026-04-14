@@ -9,6 +9,7 @@ import {
 } from "@dnd-kit/dom";
 import { Card } from "@/types/board";
 import { getCalendarDays, dateKey, getWeekDays } from "../utils/calendarUtils";
+import { CALENDAR_CARD_HEIGHT, CALENDAR_HEADER_HEIGHT } from "@/constants/app";
 
 interface MonthViewProps {
   cards: Card[];
@@ -193,10 +194,11 @@ function WeekRow({
 
   return (
     <div
-      className="grid border-b min-h-[220px]"
+      className="grid border-b"
       style={{
+        minHeight: `${CALENDAR_CARD_HEIGHT}px`,
         gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-        gridTemplateRows: "32px auto 1fr",
+        gridTemplateRows: `${CALENDAR_HEADER_HEIGHT}px auto 1fr`,
       }}
     >
       {/* Row 1: Day numbers */}

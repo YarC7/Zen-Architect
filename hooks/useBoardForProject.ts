@@ -7,6 +7,7 @@ import {
   Activity,
 } from "@/types/board";
 import { useBoardQuery, useUpdateBoardMutation } from "./useTanstackQuery";
+import { DEFAULT_COLUMN_COLORS } from "@/constants/app";
 
 let idCounter = Date.now();
 function genId(prefix: string) {
@@ -36,13 +37,6 @@ export function useBoardForProject(projectId: string) {
 
   const addColumn = useCallback(
     (title: string) => {
-      const colors = [
-        "199 89% 48%",
-        "25 95% 53%",
-        "262 83% 58%",
-        "142 71% 45%",
-        "330 81% 60%",
-      ];
       setBoard((prev) => ({
         ...prev,
         columns: [
@@ -50,7 +44,7 @@ export function useBoardForProject(projectId: string) {
           {
             id: genId("col"),
             title,
-            color: colors[prev.columns.length % colors.length],
+            color: DEFAULT_COLUMN_COLORS[prev.columns.length % DEFAULT_COLUMN_COLORS.length],
             cardIds: [],
           },
         ],

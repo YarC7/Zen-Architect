@@ -2,47 +2,30 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { DragDropProvider } from "@dnd-kit/react";
-import { move } from "@dnd-kit/helpers";
 import { useBoardForProject } from "@/hooks/useBoardForProject";
+import { filterCards, getAllAssignees } from "@/utils/filters";
+import { getBackgroundStyle } from "@/utils/styles";
 
-import { Card, Assignee } from "@/types/board";
-import { LABEL_PRESETS } from "@/types/board";
+import { Card } from "@/types/board";
 import { ViewType } from "@/types/project";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Tabs } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
-  LayoutGrid,
-  List,
-  Clock,
-  CalendarDays,
-  Filter,
   Plus,
-  X,
   Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BoardHeader } from "./kanban/components/BoardHeader";
-import { KanbanColumn } from "./kanban/components/KanbanColumn";
-import { AddColumnInline } from "./kanban/components/AddColumnInline";
+import { FiltersPanel } from "@/components/FiltersPanel";
+import { ViewTabs } from "@/components/ViewTabs";
 import { BoardSettings } from "./kanban/components/BoardSettings";
 import { ListView } from "./list";
 import { TimelineView } from "./timeline";
 import type { TimelineViewType } from "./timeline/types";
 import { CalendarView } from "./calendar";
 import { CardDetailDialog } from "./kanban/components/CardDetailDialog";
-import {
-  DragDropManager,
-  PointerSensor,
-  PointerActivationConstraints,
-} from "@dnd-kit/dom";
+import { KanbanBoard } from "@/components/KanbanBoard";
+
 export default function ProjectDetail() {
   const params = useParams<{ key: string }>();
   const id = params?.key;
@@ -51,9 +34,7 @@ export default function ProjectDetail() {
   const {
     board,
     isLoading,
-
     setBoard,
-    setBoardTitle,
     setColumnColor,
     copyColumn,
     moveAllCards,
@@ -70,17 +51,14 @@ export default function ProjectDetail() {
     updateLabel,
     deleteLabel,
     setBoardBackground,
-    archiveCard,
     restoreCard,
     deleteArchivedCard,
-    addActivity,
   } = useBoardForProject(id || "");
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string | null>(null);
   const [filterAssignee, setFilterAssignee] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ViewType>("kanban");
   const [timelineViewType, setTimelineViewType] = useState<
     "day" | "week" | "month"
@@ -88,7 +66,6 @@ export default function ProjectDetail() {
   const [timelineCurrentDate, setTimelineCurrentDate] = useState(new Date());
 
   const onTimelineDateChange = useCallback((date: Date) => {
-    console.log("Timeline date changing in parent to:", date);
     setTimelineCurrentDate(date);
   }, []);
 
@@ -96,102 +73,20 @@ export default function ProjectDetail() {
   const [showAddCol, setShowAddCol] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const manager = useMemo(
-    () =>
-      new DragDropManager({
-        sensors: [
-          PointerSensor.configure({
-            activationConstraints: [
-              new PointerActivationConstraints.Distance({ value: 8 }),
-            ],
-          }),
-        ],
-      }),
-    [],
-  );
-
   const allAssignees = useMemo(() => {
     if (!board) return [];
-    const map = new Map<string, Assignee>();
-    Object.values(board.cards).forEach((c) =>
-      c.assignees.forEach((a) => map.set(a.name, a)),
-    );
-    return Array.from(map.values());
+    return getAllAssignees(board.cards);
   }, [board]);
 
-  const handleDragOver = useCallback(
-    (event: any) => {
-      const { source, target } = event.operation;
-      if (!source || !target || !board) return;
-      if (source.type !== "item") return;
-
-      setBoard((prev) => {
-        const currentMap: Record<string, string[]> = {};
-        prev.columns.forEach((col) => {
-          currentMap[col.id] = [...col.cardIds];
-        });
-
-        const newMap = move(currentMap, event);
-        if (!newMap) return prev;
-
-        const colIds = new Set(prev.columns.map((c) => c.id));
-        for (const key in newMap) {
-          newMap[key] = newMap[key].filter((id) => !colIds.has(id));
-        }
-
-        return {
-          ...prev,
-          columns: prev.columns.map((col) => ({
-            ...col,
-            cardIds: newMap[col.id] || col.cardIds,
-          })),
-        };
-      });
-    },
-    [board, setBoard],
-  );
-
-  const handleDragEnd = useCallback(
-    (event: any) => {
-      const { canceled, source, target } = event.operation;
-      if (canceled || !source || !target || !board) return;
-
-      if (source.type === "column" && target.type === "column") {
-        setBoard((prev) => {
-          const oldIndex = prev.columns.findIndex((c) => c.id === source.id);
-          const newIndex = prev.columns.findIndex((c) => c.id === target.id);
-          if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex)
-            return prev;
-          const cols = [...prev.columns];
-          const [moved] = cols.splice(oldIndex, 1);
-          cols.splice(newIndex, 0, moved);
-          return { ...prev, columns: cols };
-        });
-      }
-    },
-    [board, setBoard],
-  );
-
-  const openCard = (card: Card) => {
+  const openCard = useCallback((card: Card) => {
     setSelectedCard(card);
     setDialogOpen(true);
-  };
+  }, []);
 
   const filteredCardIds = useCallback(
     (cardIds: string[]) => {
       if (!board) return [];
-      return cardIds.filter((id) => {
-        const card = board.cards[id];
-        if (!card) return false;
-        if (filterLabel && !card.labels.some((l) => l.id === filterLabel))
-          return false;
-        if (
-          filterAssignee &&
-          !card.assignees.some((a) => a.id === filterAssignee)
-        )
-          return false;
-        return true;
-      });
+      return filterCards(board.cards, cardIds, { filterLabel, filterAssignee });
     },
     [board, filterLabel, filterAssignee],
   );
@@ -199,25 +94,13 @@ export default function ProjectDetail() {
   const liveSelectedCard =
     selectedCard && board ? board.cards[selectedCard.id] || null : null;
 
-  const hasFilter = Boolean(filterLabel || filterAssignee);
   const archivedCount = board?.archivedCards
     ? Object.keys(board.archivedCards).length
     : 0;
 
   // Get background style
   const backgroundStyle = useMemo(() => {
-    if (!board?.background) return {};
-    if (board.background.type === "image") {
-      return {
-        backgroundImage: `url(${board.background.value})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      };
-    }
-    if (board.background.type === "gradient") {
-      return { background: board.background.value };
-    }
-    return { backgroundColor: board.background.value };
+    return getBackgroundStyle(board);
   }, [board]);
 
   const allCards = useMemo(() => {
@@ -257,107 +140,16 @@ export default function ProjectDetail() {
           className="flex-1"
         >
           <div className="flex items-center justify-between w-full">
-            <TabsList className="h-9">
-              <TabsTrigger value="kanban" className="gap-1.5 text-xs px-3">
-                <LayoutGrid className="h-3.5 w-3.5" /> Kanban
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-1.5 text-xs px-3">
-                <List className="h-3.5 w-3.5" /> List
-              </TabsTrigger>
-              <TabsTrigger value="timeline" className="gap-1.5 text-xs px-3">
-                <Clock className="h-3.5 w-3.5" /> Timeline
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1.5 text-xs px-3">
-                <CalendarDays className="h-3.5 w-3.5" /> Calendar
-              </TabsTrigger>
-            </TabsList>
+            <ViewTabs activeView={activeView} setActiveView={setActiveView} />
 
             <div className="ml-auto flex items-center gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={hasFilter ? "default" : "outline"}
-                    size="sm"
-                    className="gap-1.5"
-                  >
-                    <Filter className="h-3.5 w-3.5" />
-                    Filter
-                    {hasFilter && (
-                      <span className="ml-1 rounded-full bg-primary-foreground text-primary h-4 w-4 text-[10px] flex items-center justify-center">
-                        {(filterLabel ? 1 : 0) + (filterAssignee ? 1 : 0)}
-                      </span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-3" align="end">
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-1.5">
-                      Labels
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {LABEL_PRESETS.map((l) => (
-                        <Badge
-                          key={l.id}
-                          className="cursor-pointer text-[11px]"
-                          style={{
-                            backgroundColor:
-                              filterLabel === l.id
-                                ? `hsl(${l.color})`
-                                : `hsl(${l.color} / 0.15)`,
-                            color:
-                              filterLabel === l.id
-                                ? "white"
-                                : `hsl(${l.color})`,
-                          }}
-                          onClick={() =>
-                            setFilterLabel(filterLabel === l.id ? null : l.id)
-                          }
-                        >
-                          {l.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  {allAssignees.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-1.5">
-                        Assignees
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {allAssignees.map((a) => (
-                          <Badge
-                            key={a.id}
-                            variant={
-                              filterAssignee === a.id ? "default" : "outline"
-                            }
-                            className="cursor-pointer text-[11px]"
-                            onClick={() =>
-                              setFilterAssignee(
-                                filterAssignee === a.id ? null : a.id,
-                              )
-                            }
-                          >
-                            {a.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {hasFilter && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-xs"
-                      onClick={() => {
-                        setFilterLabel(null);
-                        setFilterAssignee(null);
-                      }}
-                    >
-                      <X className="h-3 w-3 mr-1" /> Clear filters
-                    </Button>
-                  )}
-                </PopoverContent>
-              </Popover>
+              <FiltersPanel
+                filterLabel={filterLabel}
+                filterAssignee={filterAssignee}
+                allAssignees={allAssignees}
+                setFilterLabel={setFilterLabel}
+                setFilterAssignee={setFilterAssignee}
+              />
 
               {showAddCol ? (
                 <form
@@ -414,46 +206,21 @@ export default function ProjectDetail() {
       </div>
 
       {activeView === "kanban" && (
-        <DragDropProvider
-          manager={manager}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex-1 overflow-x-auto">
-            <div className="flex gap-4 p-4 h-full items-start">
-              {board.columns.map((col, colIndex) => {
-                const visibleIds = filteredCardIds(col.cardIds);
-                const visibleCards = visibleIds
-                  .map((id) => board.cards[id])
-                  .filter(Boolean);
-                return (
-                  <KanbanColumn
-                    key={col.id}
-                    column={col}
-                    cards={visibleCards}
-                    index={colIndex}
-                    onCardClick={openCard}
-                    onToggleComplete={(cardId) => {
-                      const c = board.cards[cardId];
-                      if (c) updateCard({ ...c, completed: !c.completed });
-                    }}
-                    onRename={(title) => renameColumn(col.id, title)}
-                    onDelete={() => deleteColumn(col.id)}
-                    onAddCard={(title) => addCard(col.id, title)}
-                    onSetColor={(color) => setColumnColor(col.id, color)}
-                    onCopy={() => copyColumn(col.id)}
-                    onMoveAllCards={(toColId) => moveAllCards(col.id, toColId)}
-                    onArchiveAllCards={() => archiveAllCards(col.id)}
-                    allColumns={board.columns}
-                  />
-                );
-              })}
-              <div className="shrink-0">
-                <AddColumnInline onAddColumn={addColumn} />
-              </div>
-            </div>
-          </div>
-        </DragDropProvider>
+        <KanbanBoard
+          board={board}
+          filteredCardIds={filteredCardIds}
+          openCard={openCard}
+          updateCard={updateCard}
+          setBoard={setBoard}
+          renameColumn={renameColumn}
+          deleteColumn={deleteColumn}
+          addCard={addCard}
+          setColumnColor={setColumnColor}
+          copyColumn={copyColumn}
+          moveAllCards={moveAllCards}
+          archiveAllCards={archiveAllCards}
+          addColumn={addColumn}
+        />
       )}
 
       {activeView === "list" && (
