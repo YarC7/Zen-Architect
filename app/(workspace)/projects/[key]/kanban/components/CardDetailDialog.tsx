@@ -451,6 +451,7 @@ interface CardDetailDialogProps {
   onAddLabel: (name: string, color: string) => string;
   onUpdateLabel: (id: string, name: string, color: string) => void;
   onDeleteLabel: (id: string) => void;
+  onAddActivity?: (activity: Omit<Activity, "id" | "createdAt">) => void;
 }
 
 let checkId = Date.now();
@@ -564,7 +565,9 @@ export function CardDetailDialog({
   onAddLabel,
   onUpdateLabel,
   onDeleteLabel,
+  onAddActivity,
 }: CardDetailDialogProps) {
+  const [newComment, setNewComment] = useState("");
   const [newCheckItem, setNewCheckItem] = useState("");
   const [showActivity, setShowActivity] = useState(false);
   const [localTitle, setLocalTitle] = useState(card?.title || "");
@@ -654,6 +657,35 @@ export function CardDetailDialog({
     onUpdate({ ...card, checklist: checklist.filter((i) => i.id !== itemId) });
   };
 
+  const addComment = () => {
+    if (!newComment.trim()) return;
+
+    const commentId = `comm-${Date.now()}`;
+    const comment: Comment = {
+      id: commentId,
+      author: "User",
+      text: newComment.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const activity: Activity = {
+      id: `act-${Date.now()}`,
+      type: "comment",
+      user: "User",
+      description: `đã bình luận: "${newComment.trim().slice(0, 30)}${newComment.trim().length > 30 ? "..." : ""}"`,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedCard = {
+      ...card,
+      comments: [...(card.comments || []), comment],
+      activities: [activity, ...(card.activities || [])],
+    };
+
+    onUpdate(updatedCard);
+    setNewComment("");
+  };
+
   const mockComments: Comment[] = [
     {
       id: "c1",
@@ -694,11 +726,11 @@ export function CardDetailDialog({
   ];
 
   const feedItems = [
-    ...(card.comments || mockComments).map((c) => ({
+    ...(card.comments || []).map((c) => ({
       ...c,
       feedType: "comment" as const,
     })),
-    ...(card.activities || mockActivities).map((a) => ({
+    ...(card.activities || []).map((a) => ({
       ...a,
       feedType: "activity" as const,
     })),
@@ -1254,11 +1286,19 @@ export function CardDetailDialog({
                       placeholder="Viết bình luận..."
                       className="min-h-[100px] text-sm resize-none focus-visible:ring-primary border-muted/60 transition-all hover:border-muted group-focus-within:border-primary/50 rounded-xl p-2"
                       spellCheck={false}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                          addComment();
+                        }
+                      }}
                     />
                     <Button
                       size="icon"
                       variant="ghost"
                       className="absolute bottom-2 right-2 h-7 w-7 text-primary hover:bg-primary/10 transition-all"
+                      onClick={addComment}
                     >
                       <Send className="h-4 w-4" />
                     </Button>

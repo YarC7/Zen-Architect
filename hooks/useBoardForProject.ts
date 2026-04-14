@@ -44,7 +44,10 @@ export function useBoardForProject(projectId: string) {
           {
             id: genId("col"),
             title,
-            color: DEFAULT_COLUMN_COLORS[prev.columns.length % DEFAULT_COLUMN_COLORS.length],
+            color:
+              DEFAULT_COLUMN_COLORS[
+                prev.columns.length % DEFAULT_COLUMN_COLORS.length
+              ],
             cardIds: [],
           },
         ],
@@ -55,12 +58,23 @@ export function useBoardForProject(projectId: string) {
 
   const renameColumn = useCallback(
     (colId: string, title: string) => {
-      setBoard((prev) => ({
-        ...prev,
-        columns: prev.columns.map((c) =>
-          c.id === colId ? { ...c, title } : c,
-        ),
-      }));
+      setBoard((prev) => {
+        const oldCol = prev.columns.find((c) => c.id === colId);
+        const activity: Activity = {
+          id: genId("activity"),
+          type: "update",
+          user: "User",
+          description: `Đã đổi tên cột "${oldCol?.title}" thành "${title}"`,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...prev,
+          columns: prev.columns.map((c) =>
+            c.id === colId ? { ...c, title } : c,
+          ),
+          activities: [activity, ...(prev.activities || [])],
+        };
+      });
     },
     [setBoard],
   );
@@ -192,24 +206,191 @@ export function useBoardForProject(projectId: string) {
         assignees: [],
         checklist: [],
         completed: false,
+        activities: [
+          {
+            id: genId("activity"),
+            type: "create",
+            user: "User",
+            description: `Tạo thẻ "${title}"`,
+            createdAt: new Date().toISOString(),
+          },
+        ],
       };
-      setBoard((prev) => ({
-        ...prev,
-        cards: { ...prev.cards, [cardId]: card },
-        columns: prev.columns.map((c) =>
-          c.id === colId ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
-        ),
-      }));
+      setBoard((prev) => {
+        const activity: Activity = {
+          id: genId("activity"),
+          type: "create",
+          user: "User",
+          description: `Đã thêm thẻ "${title}" vào cột "${prev.columns.find((c) => c.id === colId)?.title || "Unknown"}"`,
+          createdAt: new Date().toISOString(),
+        };
+        return {
+          ...prev,
+          cards: { ...prev.cards, [cardId]: card },
+          columns: prev.columns.map((c) =>
+            c.id === colId ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
+          ),
+          activities: [...prev.activities, activity],
+        };
+      });
     },
     [setBoard],
   );
 
   const updateCard = useCallback(
     (card: Card) => {
-      setBoard((prev) => ({
-        ...prev,
-        cards: { ...prev.cards, [card.id]: card },
-      }));
+      setBoard((prev) => {
+        const oldCard = prev.cards[card.id];
+        if (!oldCard) return prev;
+
+        const newActivities = [...(prev.activities || [])];
+        const newCardActivities = [...(card.activities || [])];
+
+        // 1. Check for new comment
+        const isNewComment =
+          (card.comments?.length || 0) > (oldCard.comments?.length || 0);
+        if (isNewComment) {
+          const newComment = card.comments![card.comments!.length - 1];
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "comment",
+            user: "User",
+            description: `đã bình luận trên "${card.title}": ${newComment.text}`,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          // Note: CardDetailDialog already manually adds to card.activities for comments,
+          // we are just syncing to global project activities here.
+        }
+
+        // 2. Check for completion toggle
+        if (card.completed !== oldCard.completed) {
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "update",
+            user: "User",
+            description: card.completed
+              ? `đã hoàn thành thẻ "${card.title}"`
+              : `đã mở lại thẻ "${card.title}"`,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        // 3. Check for label changes
+        const addedLabel = card.labels.find(
+          (l) => !oldCard.labels.some((ol) => ol.id === l.id),
+        );
+        const removedLabel = oldCard.labels.find(
+          (ol) => !card.labels.some((l) => l.id === ol.id),
+        );
+
+        if (addedLabel || removedLabel) {
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "update",
+            user: "User",
+            description: addedLabel
+              ? `đã thêm nhãn "${addedLabel.name}" vào "${card.title}"`
+              : `đã xóa nhãn "${removedLabel?.name}" khỏi "${card.title}"`,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        // 4. Check for checklist changes
+        const addedCheckItem = card.checklist.find(
+          (item) => !oldCard.checklist?.some((oi) => oi.id === item.id),
+        );
+        const removedCheckItem = oldCard.checklist?.find(
+          (oi) => !card.checklist.some((item) => item.id === oi.id),
+        );
+        const completionChangedItem = card.checklist.find((item) => {
+          const oldItem = oldCard.checklist?.find((oi) => oi.id === item.id);
+          return oldItem && oldItem.checked !== item.checked;
+        });
+
+        if (addedCheckItem || removedCheckItem || completionChangedItem) {
+          let description = "";
+          if (addedCheckItem)
+            description = `đã thêm tác vụ "${addedCheckItem.text}" vào danh sách việc cần làm của "${card.title}"`;
+          else if (removedCheckItem)
+            description = `đã xóa tác vụ "${removedCheckItem.text}" khỏi "${card.title}"`;
+          else if (completionChangedItem)
+            description = completionChangedItem.checked
+              ? `đã hoàn thành tác vụ "${completionChangedItem.text}" trong "${card.title}"`
+              : `đã mở lại tác vụ "${completionChangedItem.text}" trong "${card.title}"`;
+
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "update",
+            user: "User",
+            description,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        // 5. Check for assignee changes
+        const addedAssignee = card.assignees.find(
+          (a) => !oldCard.assignees?.some((oa) => oa.id === a.id),
+        );
+        const removedAssignee = oldCard.assignees?.find(
+          (oa) => !card.assignees.some((a) => a.id === oa.id),
+        );
+
+        if (addedAssignee || removedAssignee) {
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "update",
+            user: "User",
+            description: addedAssignee
+              ? `đã chỉ định ${addedAssignee.name} vào "${card.title}"`
+              : `đã gỡ ${removedAssignee?.name} khỏi "${card.title}"`,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        // 6. Check for date changes
+        const dueDateChanged = card.dueDate !== oldCard.dueDate;
+        const startDateChanged = card.startDate !== oldCard.startDate;
+
+        if (dueDateChanged || startDateChanged) {
+          let description = "";
+          if (dueDateChanged && card.dueDate)
+            description = `đã đặt ngày hạn cho "${card.title}" là ${card.dueDate}`;
+          else if (dueDateChanged && !card.dueDate)
+            description = `đã gỡ ngày hạn khỏi "${card.title}"`;
+          else if (startDateChanged && card.startDate)
+            description = `đã đặt ngày bắt đầu cho "${card.title}" là ${card.startDate}`;
+          else if (startDateChanged && !card.startDate)
+            description = `đã gỡ ngày bắt đầu khỏi "${card.title}"`;
+
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "update",
+            user: "User",
+            description,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        return {
+          ...prev,
+          cards: {
+            ...prev.cards,
+            [card.id]: { ...card, activities: newCardActivities },
+          },
+          activities: newActivities,
+        };
+      });
     },
     [setBoard],
   );
@@ -217,8 +398,18 @@ export function useBoardForProject(projectId: string) {
   const deleteCard = useCallback(
     (cardId: string) => {
       setBoard((prev) => {
+        const card = prev.cards[cardId];
         const newCards = { ...prev.cards };
         delete newCards[cardId];
+
+        const activity: Activity = {
+          id: genId("activity"),
+          type: "update",
+          user: "User",
+          description: `Đã xóa thẻ "${card?.title || "không tên"}"`,
+          createdAt: new Date().toISOString(),
+        };
+
         return {
           ...prev,
           cards: newCards,
@@ -226,6 +417,7 @@ export function useBoardForProject(projectId: string) {
             ...c,
             cardIds: c.cardIds.filter((id) => id !== cardId),
           })),
+          activities: [activity, ...(prev.activities || [])],
         };
       });
     },
@@ -257,23 +449,53 @@ export function useBoardForProject(projectId: string) {
   const moveCard = useCallback(
     (cardId: string, fromColId: string, toColId: string, toIndex: number) => {
       setBoard((prev) => {
-        const columns = prev.columns.map((c) => {
+        const fromCol = prev.columns.find((c) => c.id === fromColId);
+        const toCol = prev.columns.find((c) => c.id === toColId);
+        const card = prev.cards[cardId];
+
+        if (!fromCol || !toCol || !card) return prev;
+
+        const newColumns = prev.columns.map((c) => {
           if (c.id === fromColId && fromColId !== toColId) {
-            return { ...c, cardIds: c.cardIds.filter((id) => id !== cardId) };
+            return {
+              ...c,
+              cardIds: c.cardIds.filter((id) => id !== cardId),
+            };
           }
           if (c.id === toColId) {
             const ids = c.cardIds.filter((id) => id !== cardId);
             ids.splice(toIndex, 0, cardId);
             return { ...c, cardIds: ids };
           }
-          if (fromColId === toColId && c.id === fromColId) {
-            const ids = c.cardIds.filter((id) => id !== cardId);
-            ids.splice(toIndex, 0, cardId);
-            return { ...c, cardIds: ids };
-          }
           return c;
         });
-        return { ...prev, columns };
+
+        // Only log activity if moving between different columns
+        const newActivities = [...(prev.activities || [])];
+        const newCardActivities = [...(card.activities || [])];
+
+        if (fromColId !== toColId) {
+          const description = `đã chuyển "${card.title}" từ "${fromCol.title}" sang "${toCol.title}"`;
+          const activity: Activity = {
+            id: genId("activity"),
+            type: "move",
+            user: "User",
+            description,
+            createdAt: new Date().toISOString(),
+          };
+          newActivities.unshift(activity);
+          newCardActivities.unshift(activity);
+        }
+
+        return {
+          ...prev,
+          columns: newColumns,
+          cards: {
+            ...prev.cards,
+            [cardId]: { ...card, activities: newCardActivities },
+          },
+          activities: newActivities,
+        };
       });
     },
     [setBoard],

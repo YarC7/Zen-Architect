@@ -10,11 +10,7 @@ import { Card } from "@/types/board";
 import { ViewType } from "@/types/project";
 import { Tabs } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import {
-  ArrowLeft,
-  Plus,
-  Settings,
-} from "lucide-react";
+import { ArrowLeft, Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FiltersPanel } from "@/components/FiltersPanel";
 import { ViewTabs } from "@/components/ViewTabs";
@@ -53,6 +49,7 @@ export default function ProjectDetail() {
     setBoardBackground,
     restoreCard,
     deleteArchivedCard,
+    addActivity,
   } = useBoardForProject(id || "");
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -277,6 +274,7 @@ export default function ProjectDetail() {
         labels={board.labels}
         onUpdateLabel={updateLabel}
         onDeleteLabel={deleteLabel}
+        onAddActivity={addActivity}
       />
 
       <BoardSettings
