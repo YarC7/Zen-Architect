@@ -1,0 +1,1 @@
+export type TimelineViewType = 'day' | 'week' | 'month';

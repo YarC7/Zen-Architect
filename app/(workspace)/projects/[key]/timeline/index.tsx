@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
   useCallback,
+  useEffect,
 } from "react";
 import {
   format,
@@ -17,8 +18,15 @@ import {
   eachDayOfInterval,
   isToday,
   getDay,
+  startOfDay,
+  endOfDay,
 } from "date-fns";
-import { DragDropProvider, useDraggable, useDroppable } from "@dnd-kit/react";
+import {
+  DragDropProvider,
+  useDraggable,
+  useDroppable,
+  DragOverlay,
+} from "@dnd-kit/react";
 import {
   DragDropManager,
   PointerSensor,
@@ -32,11 +40,23 @@ import {
 } from "@/components/ui/tooltip";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { BoardState, Card } from "@/types/board";
+import { TimelineViewType } from "./types";
+import {
+  getDateRangeForView,
+  getDaysInRange,
+  getMonthsInRange,
+  getWeeksInRange,
+} from "./utils/timelineUtils";
+import { TimelineHeader } from "./components/TimelineHeader";
 
 interface TimelineViewProps {
   board: BoardState;
   onCardClick: (card: Card) => void;
   onUpdateCard: (card: Card) => void;
+  viewType?: TimelineViewType;
+  currentDate?: Date;
+  onViewTypeChange?: (type: TimelineViewType) => void;
+  onDateChange?: (date: Date) => void;
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -70,7 +90,7 @@ function TimelineBar({
   onCardClick: (card: Card) => void;
   minDate: Date;
 }) {
-  const { ref, isDragging } = useDraggable({
+  const { ref, isDragging, isDropping } = useDraggable({
     id: `timeline-bar-${card.id}`,
     data: { card, minDate },
   });
@@ -80,10 +100,12 @@ function TimelineBar({
       <TooltipTrigger asChild>
         <div
           ref={ref}
-          className={`absolute top-2 rounded-md cursor-pointer hover:brightness-110 shadow-sm flex items-center px-2 overflow-hidden z-5 ${
+          className={`absolute top-2 rounded-md cursor-pointer hover:brightness-105 shadow-sm flex items-center px-3 overflow-hidden z-5 group/bar ${
             isDragging
-              ? "opacity-60 z-50 cursor-grabbing shadow-lg"
-              : "transition-all"
+              ? "opacity-60 z-50 cursor-grabbing shadow-lg scale-[1.02]"
+              : !isDropping
+                ? "transition-all duration-200"
+                : ""
           }`}
           style={{
             left: pos.left,
@@ -97,44 +119,107 @@ function TimelineBar({
             onCardClick(card);
           }}
         >
-          {pos.width > 60 && (
-            <span className="text-[11px] font-medium truncate select-none">
+          {pos.width > 40 && (
+            <span className="text-[12px] font-semibold truncate select-none drop-shadow-sm">
               {card.title}
             </span>
           )}
         </div>
       </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs p-3">
-        <div className="space-y-1.5">
-          <p className="font-semibold text-sm leading-tight text-foreground">
-            {card.title}
-          </p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-            <span>
-              {card.startDate
-                ? format(new Date(card.startDate), "dd MMM yyyy")
-                : "No start"}
-            </span>
-            <span>→</span>
-            <span>
-              {card.dueDate
-                ? format(new Date(card.dueDate), "dd MMM yyyy")
-                : "No end"}
-            </span>
+      <TooltipContent
+        side="top"
+        className="max-w-[240px] p-0 overflow-hidden border-none shadow-2xl rounded-xl animate-in fade-in zoom-in duration-200"
+        sideOffset={8}
+      >
+        <div className="flex flex-col">
+          {/* Header/Status Stripe */}
+          <div
+            className="h-1.5 w-full"
+            style={{ backgroundColor: statusStyle.bg }}
+          />
+
+          <div className="p-4 space-y-4 bg-popover text-popover-foreground">
+            {/* Title & Description */}
+            <div className="space-y-1">
+              <h4 className="font-bold text-base leading-tight">
+                {card.title}
+              </h4>
+              {card.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed italic">
+                  {card.description}
+                </p>
+              )}
+            </div>
+
+            {/* Dates Container */}
+            <div className="flex items-center gap-3 py-2 px-3 bg-accent/30 rounded-lg border border-border/40">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  Start
+                </span>
+                <span className="text-xs font-semibold tabular-nums">
+                  {card.startDate
+                    ? format(new Date(card.startDate), "dd MMM yyyy")
+                    : "—"}
+                </span>
+              </div>
+              <div className="h-4 w-px bg-border/60 self-end mb-1" />
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  Due
+                </span>
+                <span className="text-xs font-semibold tabular-nums">
+                  {card.dueDate
+                    ? format(new Date(card.dueDate), "dd MMM yyyy")
+                    : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Labels & Assignees */}
+            <div className="flex items-center justify-between gap-3 pt-1">
+              {card.labels && card.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 max-w-[180px]">
+                  {card.labels.map((label) => (
+                    <Badge
+                      key={label.id}
+                      variant="outline"
+                      className="text-[10px] px-1.5 h-5 font-semibold border-current/20"
+                      style={{
+                        backgroundColor: `hsl(${label.color})`,
+                        color: "white",
+                      }}
+                    >
+                      {label.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {card.assignees && card.assignees.length > 0 && (
+                <div className="flex flex-row-reverse items-center justify-end -space-x-2 space-x-reverse ml-auto">
+                  {card.assignees.slice(0, 3).map((user) => (
+                    <div
+                      key={user.id}
+                      title={user.name}
+                      className="w-7 h-7 rounded-full border-2 border-popover flex items-center justify-center text-[11px] font-bold text-black shadow-sm ring-1 ring-border/5"
+                      style={{
+                        backgroundColor: `hsl(${user.color})`,
+                        color: "white",
+                      }}
+                    >
+                      {user.name.charAt(0)}
+                    </div>
+                  ))}
+                  {card.assignees.length > 3 && (
+                    <div className="w-7 h-7 rounded-full border-2 border-popover bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground shadow-sm ring-1 ring-border/5">
+                      +{card.assignees.length - 3}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <Badge
-            className="text-[10px] h-5"
-            style={{
-              backgroundColor: statusStyle.bg,
-              color: statusStyle.text,
-            }}
-          >
-            {statusStyle.bg === "#E2E8F0"
-              ? "To Do"
-              : statusStyle.bg === "#DBEAFE"
-                ? "In Progress"
-                : "Done"}
-          </Badge>
         </div>
       </TooltipContent>
     </Tooltip>
@@ -225,6 +310,10 @@ export function TimelineView({
   board,
   onCardClick,
   onUpdateCard,
+  viewType = "month",
+  currentDate = new Date(),
+  onViewTypeChange,
+  onDateChange,
 }: TimelineViewProps) {
   const [expandedCols, setExpandedCols] = useState<Set<string>>(
     () => new Set(board.columns.map((c) => c.id)),
@@ -244,8 +333,40 @@ export function TimelineView({
     [],
   );
 
-  // Calculate date range
-  const { minDate, months, days, totalDays } = useMemo(() => {
+  // Calculate date range based on view type
+  const { minDate, months, weeks, days, totalDays, periodLabel } =
+    useMemo(() => {
+      // Get date range from view type and current date
+      const range = getDateRangeForView(currentDate, viewType);
+      const min = startOfDay(range.start);
+      const max = endOfDay(range.end);
+
+      const allDays = getDaysInRange(min, max);
+      const totalDaysCount = allDays.length;
+
+      // Get months (for month view)
+      const monthsInfo = getMonthsInRange(min, max);
+
+      // Get weeks (for week view)
+      const weeksInfo = getWeeksInRange(min, max);
+
+      return {
+        minDate: min,
+        months: monthsInfo,
+        weeks: weeksInfo,
+        days: allDays.map((d) => d.date),
+        totalDays: totalDaysCount,
+        periodLabel: format(currentDate, "MMMM yyyy"),
+      };
+    }, [currentDate, viewType, board.cards]);
+
+  // Legacy date range for cards that have dates outside current view
+  const {
+    minDate: cardMinDate,
+    months: cardMonths,
+    days: cardDays,
+    totalDays: cardTotalDays,
+  } = useMemo(() => {
     const dates: Date[] = [];
     Object.values(board.cards).forEach((card) => {
       if (card.startDate) dates.push(new Date(card.startDate));
@@ -292,6 +413,15 @@ export function TimelineView({
     };
   }, [board.cards]);
 
+  // Check if we should show the header based on view type
+  const showMonthsHeader = viewType === "month";
+  const showWeeksHeader = viewType === "week";
+  const headerData = showMonthsHeader
+    ? months
+    : showWeeksHeader
+      ? weeks
+      : months;
+
   const toggleCol = (colId: string) => {
     setExpandedCols((prev) => {
       const next = new Set(prev);
@@ -327,6 +457,24 @@ export function TimelineView({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to today on mount and when currentDate changes
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollContainer = scrollRef.current;
+      const today = new Date();
+      const offset = differenceInDays(today, minDate) * DAY_WIDTH;
+
+      // Center today in the view
+      const scrollPos =
+        offset - scrollContainer.clientWidth / 2 + DAY_WIDTH / 2;
+
+      scrollContainer.scrollTo({
+        left: Math.max(0, scrollPos),
+        behavior: "smooth",
+      });
+    }
+  }, [currentDate, minDate]); // Re-run when currentDate (set by Today button) or minDate changes
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (leftPanelRef.current) {
@@ -367,6 +515,16 @@ export function TimelineView({
   return (
     <DragDropProvider manager={manager} onDragEnd={handleDragEnd}>
       <div className="flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-card h-full font-sans">
+        {onViewTypeChange && onDateChange && (
+          <div className="px-4 pt-4">
+            <TimelineHeader
+              viewType={viewType}
+              currentDate={currentDate}
+              onViewTypeChange={onViewTypeChange}
+              onDateChange={onDateChange}
+            />
+          </div>
+        )}
         <div className="flex flex-1 overflow-hidden">
           {/* Left scope panel */}
           <div
@@ -484,13 +642,13 @@ export function TimelineView({
                 style={{ height: HEADER_HEIGHT }}
               >
                 <div className="flex" style={{ height: HEADER_HEIGHT / 2 }}>
-                  {months.map((m, i) => (
+                  {headerData.map((h, i) => (
                     <div
                       key={i}
                       className="border-r border-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground bg-muted/10"
-                      style={{ width: m.days * DAY_WIDTH }}
+                      style={{ width: h.days * DAY_WIDTH }}
                     >
-                      {m.label}
+                      {h.label}
                     </div>
                   ))}
                 </div>
@@ -571,25 +729,25 @@ export function TimelineView({
                         </div>
                       </div>
 
-                       {isExpanded &&
-                         colCards.map((card) => {
-                           const pos = getBarPosition(card);
-                           if (!pos) return null;
+                      {isExpanded &&
+                        colCards.map((card) => {
+                          const pos = getBarPosition(card);
+                          if (!pos) return null;
 
-                           return (
-                             <TimelineCardRow
-                               key={card.id}
-                               card={card}
-                               pos={pos}
-                               statusStyle={statusStyle}
-                               onCardClick={onCardClick}
-                               minDate={minDate}
-                               totalDays={totalDays}
-                               hoveredCardId={hoveredCardId}
-                               setHoveredCardId={setHoveredCardId}
-                             />
-                           );
-                         })}
+                          return (
+                            <TimelineCardRow
+                              key={card.id}
+                              card={card}
+                              pos={pos}
+                              statusStyle={statusStyle}
+                              onCardClick={onCardClick}
+                              minDate={minDate}
+                              totalDays={totalDays}
+                              hoveredCardId={hoveredCardId}
+                              setHoveredCardId={setHoveredCardId}
+                            />
+                          );
+                        })}
                     </div>
                   );
                 })}
@@ -598,6 +756,37 @@ export function TimelineView({
           </div>
         </div>
       </div>
+      <DragOverlay dropAnimation={null}>
+        {(draggable) => {
+          if (!draggable) return null;
+          const card = draggable.data?.card as Card;
+          if (!card) return null;
+          const pos = getBarPosition(card);
+          if (!pos) return null;
+          const statusStyle = getStatusStyle(
+            board.columns.find((col) => col.cardIds.includes(card.id))?.title ||
+              "",
+          );
+          return (
+            <div
+              className="rounded-md shadow-lg flex items-center px-2 overflow-hidden"
+              style={{
+                width: pos.width,
+                height: ROW_HEIGHT - 16,
+                backgroundColor: statusStyle.bg,
+                color: statusStyle.text,
+                opacity: 0.9,
+              }}
+            >
+              {pos.width > 60 && (
+                <span className="text-[11px] font-medium truncate select-none">
+                  {card.title}
+                </span>
+              )}
+            </div>
+          );
+        }}
+      </DragOverlay>
     </DragDropProvider>
   );
 }

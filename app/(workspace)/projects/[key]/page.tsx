@@ -35,6 +35,7 @@ import { AddColumnInline } from "./kanban/components/AddColumnInline";
 import { BoardSettings } from "./kanban/components/BoardSettings";
 import { ListView } from "./list";
 import { TimelineView } from "./timeline";
+import type { TimelineViewType } from "./timeline/types";
 import { CalendarView } from "./calendar";
 import { CardDetailDialog } from "./kanban/components/CardDetailDialog";
 import {
@@ -75,7 +76,18 @@ export default function ProjectDetail() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string | null>(null);
   const [filterAssignee, setFilterAssignee] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ViewType>("kanban");
+  const [timelineViewType, setTimelineViewType] = useState<
+    "day" | "week" | "month"
+  >("month");
+  const [timelineCurrentDate, setTimelineCurrentDate] = useState(new Date());
+
+  const onTimelineDateChange = useCallback((date: Date) => {
+    console.log("Timeline date changing in parent to:", date);
+    setTimelineCurrentDate(date);
+  }, []);
+
   const [newColTitle, setNewColTitle] = useState("");
   const [showAddCol, setShowAddCol] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -447,11 +459,17 @@ export default function ProjectDetail() {
       )}
 
       {activeView === "timeline" && (
-        <div className="flex-1 overflow-hidden p-4 h-[calc(100vh-140px)]">
+        <div className="flex-1 overflow-hidden p-4 h-[calc(100vh-64px)]">
           <TimelineView
             board={board}
             onCardClick={openCard}
             onUpdateCard={updateCard}
+            viewType={timelineViewType as TimelineViewType}
+            currentDate={timelineCurrentDate}
+            onViewTypeChange={(type) =>
+              setTimelineViewType(type as "day" | "week" | "month")
+            }
+            onDateChange={onTimelineDateChange}
           />
         </div>
       )}
