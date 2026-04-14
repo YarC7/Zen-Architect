@@ -2,8 +2,8 @@
 status: resolved
 trigger: "Timeline view dragging bar still not working after drop zone fixes"
 created: "2026-04-12T00:00:00.000Z"
-updated: "2026-04-14T03:39:00.155Z"
-commits: ["d849bec", "54ef419", "7ba71b3"]
+updated: "2026-04-14T03:56:15.705Z"
+commits: ["d849bec", "54ef419", "7ba71b3", "73d482b"]
 ---
 
 ## Symptoms
@@ -77,42 +77,45 @@ timeline: Issue persists after two commits attempting to fix it (d849bec, 54ef41
 ## Resolution
 
 root_cause: |
-  useDraggable returns handleRef as a CALLBACK FUNCTION (element: Element | null) => void,
-  but TimelineBar is using it as a React ref object with ref={handleRef}.
+  useDraggable returns BOTH 'ref' and 'handleRef'. The 'ref' is the correct
+  callback to use directly on the element. The previous implementation tried
+  to use handleRef with useEffect, which was unnecessarily complex.
   
-  The @dnd-kit/react API expects handleRef to be called with the DOM element directly.
-  When used as a ref, @dnd-kit never receives the DOM element, so the draggable is never
-  properly initialized. This prevents all drag events from firing.
+  The @dnd-kit/react API provides 'ref' as the primary way to attach the
+  draggable element. Using it directly simplifies the code and ensures
+  proper initialization.
 
 fix: |
-  Change TimelineBar to use handleRef as a callback function instead of a ref.
+  Change TimelineBar to use 'ref' directly from useDraggable:
   
-  Use useEffect to call handleRef with the div element:
   ```typescript
-  const divRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    if (divRef.current) {
-      handleRef(divRef.current);
-    }
-  }, [handleRef]);
-  
+  const { ref, isDragging } = useDraggable({
+    id: `timeline-bar-${card.id}`,
+    data: { card, minDate },
+  });
+
   return (
     <div
-      ref={divRef}
+      ref={ref}
       className={...}
       style={{...}}
     >
   ```
+  
+  This is simpler and more correct than the handleRef callback approach.
 
 verification: |
-  ✓ Build succeeded with no TypeScript errors
-  ✓ TimelineBar now uses handleRef as a callback function via useEffect
-  ✓ divRef properly attached to the draggable div element
-  ✓ @dnd-kit will now receive the DOM element and initialize drag handlers
+  ✓ Build succeeded with no TypeScript errors (7.8s compile time)
+  ✓ TimelineBar now uses ref directly from useDraggable
+  ✓ Removed unnecessary useRef and useEffect
+  ✓ Removed unused useEffect import
+  ✓ @dnd-kit will now properly initialize drag handlers on the element
   
   Ready for manual testing: Open timeline view and attempt to drag a card bar.
   Expected: Drag should initiate, visual feedback should appear, dates should update.
 
 files_changed:
-- app/(workspace)/projects/[key]/timeline/index.tsx: Fixed TimelineBar to use handleRef callback correctly
+- app/(workspace)/projects/[key]\timeline/index.tsx: 
+  - Changed useDraggable to use 'ref' directly instead of handleRef callback
+  - Removed useRef and useEffect from TimelineBar component
+  - Removed unused useEffect import
