@@ -72,10 +72,10 @@ export function MonthView({
 
       const duration = origStart
         ? Math.round(
-            (new Date(origEnd.split("T")[0]).getTime() -
-              new Date(origStart.split("T")[0]).getTime()) /
-              (1000 * 60 * 60 * 24),
-          )
+          (new Date(origEnd.split("T")[0]).getTime() -
+            new Date(origStart.split("T")[0]).getTime()) /
+          (1000 * 60 * 60 * 24),
+        )
         : 0;
 
       const newStart = new Date(targetDateKey);
@@ -192,13 +192,95 @@ function WeekRow({
     return map;
   }, [singleDay]);
 
+  // Layout algorithm: assign each spanning card to a row based on overlap
+  // Cards that don't overlap share a row; overlapping cards get separate rows
+  const spanningLayout = useMemo(() => {
+    interface LayoutCard {
+      card: Card;
+      row: number;
+      startCol: number;
+      endCol: number;
+      isActualStart: boolean;
+      isActualEnd: boolean;
+    }
+
+    // First pass: compute column positions for each card
+    const cardPositions: LayoutCard[] = spanning.map((card) => {
+      const startStr = card.startDate!.split("T")[0];
+      const endStr = card.dueDate!.split("T")[0];
+
+      let startCol = -1;
+      let endCol = -1;
+
+      for (let i = 0; i < 7; i++) {
+        const ci = gridColumn(i);
+        if (ci < 0) continue;
+        const dayKey = dateKey(week[i].date);
+        if (dayKey >= startStr && startCol === -1) {
+          startCol = ci;
+        }
+        if (dayKey <= endStr) {
+          endCol = Math.max(endCol, ci);
+        }
+      }
+
+      const actualStartIdx = showWeekends ? startCol - 1 : startCol;
+      const actualEndIdx = showWeekends ? endCol - 1 : endCol;
+      const isActualStart =
+        startStr === dateKey(week[actualStartIdx]?.date || week[0].date);
+      const isActualEnd =
+        endStr === dateKey(week[actualEndIdx]?.date || week[6].date);
+
+      return {
+        card,
+        row: 0,
+        startCol,
+        endCol,
+        isActualStart,
+        isActualEnd,
+      };
+    }).filter((c) => c.startCol !== -1 && c.endCol !== -1 && c.endCol >= c.startCol);
+
+    // Sort by start column, then by end column (longer cards first)
+    cardPositions.sort((a, b) => {
+      if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+      return b.endCol - a.endCol;
+    });
+
+    // Assign rows using greedy interval coloring
+    const rows: number[][] = []; // each row is an array of endCol values
+    for (const cp of cardPositions) {
+      let assignedRow = -1;
+      for (let r = 0; r < rows.length; r++) {
+        const rowEnds = rows[r];
+        // Check if this card overlaps with any card in this row
+        const overlaps = rowEnds.some((end) => end >= cp.startCol);
+        if (!overlaps) {
+          assignedRow = r;
+          break;
+        }
+      }
+      if (assignedRow === -1) {
+        assignedRow = rows.length;
+        rows.push([]);
+      }
+      cp.row = assignedRow;
+      rows[assignedRow].push(cp.endCol);
+    }
+
+    return { layout: cardPositions, totalRows: rows.length };
+  }, [spanning, gridColumn, week, showWeekends]);
+
+  const spanningCardRowHeight = 28; // px per spanning card row
+  const spanningSectionHeight = Math.max(spanningLayout.totalRows * spanningCardRowHeight, 28);
+
   return (
     <div
       className="grid border-b"
       style={{
         minHeight: `${CALENDAR_CARD_HEIGHT}px`,
         gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-        gridTemplateRows: `${CALENDAR_HEADER_HEIGHT}px auto 1fr`,
+        gridTemplateRows: `${CALENDAR_HEADER_HEIGHT}px ${spanningSectionHeight}px 1fr`,
       }}
     >
       {/* Row 1: Day numbers */}
@@ -212,23 +294,21 @@ function WeekRow({
         return (
           <div
             key={`header-${di}`}
-            className={`p-1.5 flex transition-colors ${
-              dayInfo.isOtherMonth
+            className={`p-1.5 flex transition-colors ${dayInfo.isOtherMonth
                 ? "bg-muted/10"
                 : isToday
                   ? "bg-primary/5"
                   : "bg-card"
-            } ${ci < gridCols ? "border-r" : ""}`}
+              } ${ci < gridCols ? "border-r" : ""}`}
             style={{ gridColumn: ci, gridRow: "1" }}
           >
             <div
-              className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
-                isToday
+              className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday
                   ? "bg-primary text-primary-foreground font-bold"
                   : dayInfo.isOtherMonth
                     ? "text-muted-foreground/40"
                     : "text-foreground"
-              }`}
+                }`}
             >
               {dayInfo.day}
             </div>
@@ -236,48 +316,21 @@ function WeekRow({
         );
       })}
 
-      {/* Row 2: Spanning cards — now below the numbers */}
-      {spanning.map((card) => {
-        const startStr = card.startDate!.split("T")[0];
-        const endStr = card.dueDate!.split("T")[0];
-
-        let startCol = -1;
-        let endCol = -1;
-
-        for (let i = 0; i < 7; i++) {
-          const ci = gridColumn(i);
-          if (ci < 0) continue;
-          const dayKey = dateKey(week[i].date);
-          if (dayKey >= startStr && startCol === -1) {
-            startCol = ci;
-          }
-          if (dayKey <= endStr) {
-            endCol = Math.max(endCol, ci);
-          }
-        }
-
-        if (startCol === -1 || endCol === -1 || endCol < startCol) return null;
-
-        const actualStartIdx = showWeekends ? startCol - 1 : startCol;
-        const actualEndIdx = showWeekends ? endCol - 1 : endCol;
-        const isActualStart =
-          startStr === dateKey(week[actualStartIdx]?.date || week[0].date);
-        const isActualEnd =
-          endStr === dateKey(week[actualEndIdx]?.date || week[6].date);
-
+      {/* Row 2: Spanning cards — positioned by computed layout rows */}
+      {spanningLayout.layout.map((lc) => {
         return (
           <DraggableSpanningCard
-            key={`${card.id}-${weekKey}`}
-            card={card}
-            isStart={isActualStart}
-            isEnd={isActualEnd}
+            key={`${lc.card.id}-${weekKey}`}
+            card={lc.card}
+            isStart={lc.isActualStart}
+            isEnd={lc.isActualEnd}
             weekKey={weekKey}
             onCardClick={onCardClick}
             style={{
-              gridColumn: `${startCol} / ${endCol + 1}`,
+              gridColumn: `${lc.startCol} / ${lc.endCol + 1}`,
               gridRow: "2",
-              marginTop: "4px",
-              marginBottom: "4px",
+              marginTop: `${lc.row * spanningCardRowHeight}px`,
+              height: `${spanningCardRowHeight - 2}px`,
               paddingLeft: "4px",
               paddingRight: "4px",
             }}
@@ -347,27 +400,25 @@ function DraggableSpanningCard({
         handleRef(el);
       }}
       style={{ ...style, zIndex: 10, position: "relative" }}
-      className={`w-full min-w-0 overflow-hidden flex flex-col rounded-md border bg-card/95 hover:shadow-md transition-all select-none pointer-events-auto ${
-        !isStart ? "rounded-l-none border-l-0" : ""
-      } ${!isEnd ? "rounded-r-none border-r-0" : ""} cursor-pointer`}
+      className={`w-full min-w-0 overflow-hidden flex flex-col rounded-md border bg-card/95 hover:shadow-md transition-all select-none pointer-events-auto ${!isStart ? "rounded-l-none border-l-0" : ""
+        } ${!isEnd ? "rounded-r-none border-r-0" : ""} cursor-pointer`}
       onClick={(e) => {
         e.stopPropagation();
         onCardClick(card);
       }}
     >
       <div
-        className="h-1.5 w-8 rounded-full mt-1 ml-1 shrink-0"
+        className="h-1 w-8 rounded-full mt-1 ml-1 shrink-0"
         style={{
           backgroundColor: `hsl(${barColor})`,
         }}
       />
-      <div className="min-w-0 px-2 py-1">
+      <div className="min-w-0 px-2">
         <span
-          className={`block min-w-0 truncate text-xs leading-snug ${
-            isCompleted
+          className={`block min-w-0 truncate text-xs leading-snug ${isCompleted
               ? "line-through text-muted-foreground"
               : "text-foreground"
-          }`}
+            }`}
         >
           {card.title}
         </span>
@@ -400,13 +451,12 @@ function DroppableDayCell({
     <div
       ref={ref}
       data-date-key={dk}
-      className={`relative z-0 min-w-0 border-r last:border-r-0 p-1.5 transition-colors pointer-events-none ${
-        dayInfo.isOtherMonth
+      className={`relative z-0 min-w-0 border-r last:border-r-0 p-1.5 transition-colors pointer-events-none ${dayInfo.isOtherMonth
           ? "bg-muted/10"
           : isToday
             ? "bg-primary/5"
             : "bg-card"
-      } ${isDropTarget ? "ring-2 ring-primary ring-inset" : ""}`}
+        } ${isDropTarget ? "ring-2 ring-primary ring-inset" : ""}`}
       style={{ gridColumn: `${gridColumn}`, gridRow: "3" }}
     >
       <div className="space-y-1 pointer-events-auto">
@@ -460,11 +510,10 @@ function DraggableDayCard({
       />
       <div className="min-w-0 px-2 py-1">
         <span
-          className={`block min-w-0 truncate text-xs leading-snug ${
-            isCompleted
+          className={`block min-w-0 truncate text-xs leading-snug ${isCompleted
               ? "line-through text-muted-foreground"
               : "text-foreground"
-          }`}
+            }`}
         >
           {card.title}
         </span>

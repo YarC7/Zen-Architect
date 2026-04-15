@@ -1,10 +1,8 @@
-import React from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BoardState, Card } from "@/types/board";
 import { CheckCircle2, Circle } from "lucide-react";
 import {
-  HEADER_HEIGHT,
   ROW_HEIGHT,
   SCOPE_WIDTH,
   getStatusStyle,
@@ -44,16 +42,6 @@ export function ScopePanel({
       className="shrink-0 border-r border-border bg-card flex flex-col select-none"
       style={{ width: SCOPE_WIDTH }}
     >
-      {/* Header */}
-      <div
-        className="flex items-center border-b border-border px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-card sticky top-0 z-20"
-        style={{ height: HEADER_HEIGHT }}
-      >
-        <span className="w-8">#</span>
-        <span className="flex-1">Issue</span>
-        <span className="w-24 text-center">Status</span>
-      </div>
-
       {/* Rows */}
       <div className="overflow-y-auto flex-1 min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {board.columns.map((col) => {

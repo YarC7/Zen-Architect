@@ -3,17 +3,20 @@ import { useDroppable } from "@dnd-kit/react";
 import { Card, BoardState } from "@/types/board";
 import { TimelineCardRow } from "./TimelineCardRow";
 import {
-  DAY_WIDTH,
   ROW_HEIGHT,
   HEADER_HEIGHT,
   getStatusStyle,
 } from "../constants";
+import { TimelineViewType } from "../types";
+import { getMonthsInRange } from "../utils/timelineUtils";
 
 interface TimelinePanelProps {
   board: BoardState;
   days: Date[];
   totalDays: number;
   minDate: Date;
+  dayWidth: number;
+  viewType: TimelineViewType;
   expandedCols: Set<string>;
   expandedCards: Set<string>;
   expandedUnsetCols: Set<string>;
@@ -31,6 +34,8 @@ export function TimelinePanel({
   days,
   totalDays,
   minDate,
+  dayWidth,
+  viewType,
   expandedCols,
   expandedCards,
   expandedUnsetCols,
@@ -43,10 +48,10 @@ export function TimelinePanel({
   todayOffset,
 }: TimelinePanelProps) {
   return (
-    <TimelineDropZone totalDays={totalDays}>
-      <TimelineHeaders days={days} />
+    <TimelineDropZone totalDays={totalDays} dayWidth={dayWidth}>
+      <TimelineHeaders days={days} dayWidth={dayWidth} />
       <TodayLine todayOffset={todayOffset} />
-      <WeekendShading days={days} />
+      <WeekendShading days={days} dayWidth={dayWidth} />
       <CardRows
         board={board}
         expandedCols={expandedCols}
@@ -59,6 +64,7 @@ export function TimelinePanel({
         onHoverCard={onHoverCard}
         minDate={minDate}
         totalDays={totalDays}
+        dayWidth={dayWidth}
         getBarPosition={getBarPosition}
       />
     </TimelineDropZone>
@@ -68,9 +74,14 @@ export function TimelinePanel({
 interface TimelineDropZoneProps {
   children: React.ReactNode;
   totalDays: number;
+  dayWidth: number;
 }
 
-function TimelineDropZone({ children, totalDays }: TimelineDropZoneProps) {
+function TimelineDropZone({
+  children,
+  totalDays,
+  dayWidth,
+}: TimelineDropZoneProps) {
   const { ref, isDropTarget } = useDroppable({
     id: "timeline-drop-zone",
   });
@@ -78,7 +89,7 @@ function TimelineDropZone({ children, totalDays }: TimelineDropZoneProps) {
   return (
     <div
       ref={ref}
-      style={{ width: totalDays * DAY_WIDTH, minHeight: "100%" }}
+      style={{ width: totalDays * dayWidth, minHeight: "100%" }}
       className={`relative transition-colors ${
         isDropTarget ? "bg-primary/5 ring-2 ring-inset ring-primary" : ""
       }`}
@@ -90,45 +101,46 @@ function TimelineDropZone({ children, totalDays }: TimelineDropZoneProps) {
 
 interface TimelineHeadersProps {
   days: Date[];
+  dayWidth: number;
 }
 
-function TimelineHeaders({ days }: TimelineHeadersProps) {
+function TimelineHeaders({ days, dayWidth }: TimelineHeadersProps) {
+  const months = getMonthsInRange(days[0], days[days.length - 1]);
+
   return (
     <div
       className="sticky top-0 z-20 bg-card border-b border-border"
       style={{ height: HEADER_HEIGHT }}
     >
       <div className="flex" style={{ height: HEADER_HEIGHT / 2 }}>
-        {days.map((day, i) => {
-          const isFirstOfMonth = i === 0 || day.getDate() === 1;
-          if (!isFirstOfMonth) return null;
-          return (
-            <div
-              key={i}
-              className="border-r border-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground bg-muted/10"
-              style={{ width: DAY_WIDTH }}
-            >
-              {format(day, "MMM")}
-            </div>
-          );
-        })}
+        {months.map((month, i) => (
+          <div
+            key={i}
+            className="border-r border-border flex items-center justify-center text-[11px] font-semibold text-muted-foreground bg-muted/10 shrink-0"
+            style={{ width: month.days * dayWidth }}
+          >
+            {month.label}
+          </div>
+        ))}
       </div>
       <div className="flex" style={{ height: HEADER_HEIGHT / 2 }}>
         {days.map((day, i) => {
           const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+          const showFullDate = dayWidth > 100;
+
           return (
             <div
               key={i}
-              className={`flex items-center justify-center text-[10px] border-r border-border/40 ${
+              className={`flex items-center justify-center text-[10px] border-r border-border/40 shrink-0 ${
                 isToday(day)
                   ? "bg-primary text-primary-foreground font-bold"
                   : isWeekend
                     ? "text-muted-foreground/50"
                     : "text-muted-foreground"
               }`}
-              style={{ width: DAY_WIDTH }}
+              style={{ width: dayWidth }}
             >
-              {format(day, "d")}
+              {showFullDate ? format(day, "EEE d") : format(day, "d")}
             </div>
           );
         })}
@@ -156,9 +168,10 @@ function TodayLine({ todayOffset }: TodayLineProps) {
 
 interface WeekendShadingProps {
   days: Date[];
+  dayWidth: number;
 }
 
-function WeekendShading({ days }: WeekendShadingProps) {
+function WeekendShading({ days, dayWidth }: WeekendShadingProps) {
   return (
     <>
       {days.map((day, i) => {
@@ -167,7 +180,7 @@ function WeekendShading({ days }: WeekendShadingProps) {
             <div
               key={`w-${i}`}
               className="absolute top-0 bottom-0 bg-muted/20 pointer-events-none"
-              style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}
+              style={{ left: i * dayWidth, width: dayWidth }}
             />
           );
         }
@@ -189,6 +202,7 @@ interface CardRowsProps {
   onHoverCard: (cardId: string | null) => void;
   minDate: Date;
   totalDays: number;
+  dayWidth: number;
   getBarPosition: (card: Card) => { left: number; width: number } | null;
 }
 
@@ -204,6 +218,7 @@ function CardRows({
   onHoverCard,
   minDate,
   totalDays,
+  dayWidth,
   getBarPosition,
 }: CardRowsProps) {
   return (
@@ -235,8 +250,8 @@ function CardRows({
                 {Array.from({ length: totalDays }).map((_, i) => (
                   <div
                     key={i}
-                    className="border-r border-border/20 h-full"
-                    style={{ width: DAY_WIDTH }}
+                    className="border-r border-border/20 h-full shrink-0"
+                    style={{ width: dayWidth }}
                   />
                 ))}
               </div>
@@ -257,6 +272,7 @@ function CardRows({
                         onCardClick={onCardClick}
                         minDate={minDate}
                         totalDays={totalDays}
+                        dayWidth={dayWidth}
                         hoveredCardId={hoveredCardId}
                         setHoveredCardId={onHoverCard}
                         isExpanded={expandedCards.has(card.id)}
@@ -276,8 +292,8 @@ function CardRows({
                           {Array.from({ length: totalDays }).map((_, i) => (
                             <div
                               key={i}
-                              className="border-r border-border/20 h-full"
-                              style={{ width: DAY_WIDTH }}
+                              className="border-r border-border/20 h-full shrink-0"
+                              style={{ width: dayWidth }}
                             />
                           ))}
                         </div>
@@ -295,8 +311,8 @@ function CardRows({
                                   (_, i) => (
                                     <div
                                       key={i}
-                                      className="border-r border-border/20 h-full"
-                                      style={{ width: DAY_WIDTH }}
+                                      className="border-r border-border/20 h-full shrink-0"
+                                      style={{ width: dayWidth }}
                                     />
                                   ),
                                 )}

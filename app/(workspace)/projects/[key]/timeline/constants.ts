@@ -1,10 +1,20 @@
 // Timeline layout constants
-export const DAY_WIDTH = 40;
 export const ROW_HEIGHT = 44;
 export const SUBTASK_HEIGHT = 32;
 export const HEADER_HEIGHT = 56;
 export const SCOPE_WIDTH = 420;
 export const DRAG_ACTIVATION_DISTANCE = 5;
+
+import { TimelineViewType } from "./types";
+
+export const VIEW_CONFIG: Record<TimelineViewType, { dayWidth: number }> = {
+  day: { dayWidth: 120 },
+  week: { dayWidth: 60 },
+  month: { dayWidth: 32 },
+};
+
+export const getDayWidth = (viewType: TimelineViewType) => 
+  VIEW_CONFIG[viewType]?.dayWidth || 40;
 
 // Status colors mapping
 export const STATUS_COLORS: Record<string, { bg: string; text: string }> = {

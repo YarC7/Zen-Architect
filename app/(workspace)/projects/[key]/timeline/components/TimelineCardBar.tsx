@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/types/board";
 import { format } from "date-fns";
-import { ROW_HEIGHT, DAY_WIDTH } from "../constants";
+import { ROW_HEIGHT } from "../constants";
 
 interface TimelineCardBarProps {
   card: Card;

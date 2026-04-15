@@ -24,6 +24,8 @@ import {
   PointerSensor,
   PointerActivationConstraints,
 } from "@dnd-kit/dom";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, BoardState } from "@/types/board";
 import { TimelineViewType } from "./types";
 import {
@@ -31,14 +33,19 @@ import {
   getDaysInRange,
   getMonthsInRange,
   getWeeksInRange,
+  getPreviousDate,
+  getNextDate,
 } from "./utils/timelineUtils";
 import { TimelineHeader } from "./components/TimelineHeader";
 import { ScopePanel } from "./components/ScopePanel";
 import { TimelinePanel } from "./components/TimelinePanel";
 import {
-  DAY_WIDTH,
+  ROW_HEIGHT,
+  HEADER_HEIGHT,
+  SCOPE_WIDTH,
   DRAG_ACTIVATION_DISTANCE,
   getStatusStyle,
+  getDayWidth,
 } from "./constants";
 
 interface TimelineViewProps {
@@ -75,6 +82,7 @@ export function TimelineView({
   const [expandedUnsetCols, setExpandedUnsetCols] = useState<Set<string>>(
     new Set(),
   );
+  const [zoom, setZoom] = useState(1);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [hoveredColId, setHoveredColId] = useState<string | null>(null);
 
@@ -96,17 +104,31 @@ export function TimelineView({
   );
 
   // Date range calculations
-  const { minDate, days, totalDays } = useMemo(() => {
+  const { minDate, days, totalDays, dayWidth } = useMemo(() => {
     const range = getDateRangeForView(currentDate, viewType);
     const min = startOfDay(range.start);
     const max = endOfDay(range.end);
     const allDays = getDaysInRange(min, max);
+    const width = getDayWidth(viewType) * zoom;
     return {
       minDate: min,
       days: allDays.map((d) => d.date),
       totalDays: allDays.length,
+      dayWidth: width,
     };
-  }, [currentDate, viewType]);
+  }, [currentDate, viewType, zoom]);
+
+  const handlePrevious = () => {
+    onDateChange?.(getPreviousDate(currentDate, viewType));
+  };
+
+  const handleNext = () => {
+    onDateChange?.(getNextDate(currentDate, viewType));
+  };
+
+  const handleToday = () => {
+    onDateChange?.(new Date());
+  };
 
   // Calculate bar position for a card
   const getBarPosition = useCallback(
@@ -122,20 +144,20 @@ export function TimelineView({
         : card.startDate
           ? addDays(new Date(card.startDate), 3)
           : new Date();
-      const left = differenceInDays(start, minDate) * DAY_WIDTH;
+      const left = differenceInDays(start, minDate) * dayWidth;
       const width = Math.max(
-        (differenceInDays(end, start) + 1) * DAY_WIDTH,
-        DAY_WIDTH,
+        (differenceInDays(end, start) + 1) * dayWidth,
+        dayWidth,
       );
       return { left, width };
     },
-    [minDate],
+    [minDate, dayWidth],
   );
 
   // Today marker position
   const todayOffset = useMemo(
-    () => differenceInDays(new Date(), minDate) * DAY_WIDTH + DAY_WIDTH / 2,
-    [minDate],
+    () => differenceInDays(new Date(), minDate) * dayWidth + dayWidth / 2,
+    [minDate, dayWidth],
   );
 
   // Scroll refs
@@ -145,15 +167,15 @@ export function TimelineView({
   // Auto-scroll to today on mount
   useEffect(() => {
     if (scrollRef.current) {
-      const offset = differenceInDays(new Date(), minDate) * DAY_WIDTH;
+      const offset = differenceInDays(new Date(), minDate) * dayWidth;
       const scrollPos =
-        offset - scrollRef.current.clientWidth / 2 + DAY_WIDTH / 2;
+        offset - scrollRef.current.clientWidth / 2 + dayWidth / 2;
       scrollRef.current.scrollTo({
         left: Math.max(0, scrollPos),
         behavior: "smooth",
       });
     }
-  }, [minDate]);
+  }, [minDate, dayWidth]);
 
   // Sync scroll logic with requestAnimationFrame for maximum performance
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -199,7 +221,7 @@ export function TimelineView({
       }
 
       // Handle time shift
-      const daysShift = Math.round(transform.x / DAY_WIDTH);
+      const daysShift = Math.round(transform.x / dayWidth);
       if (daysShift !== 0) {
         const newStart = card.startDate
           ? addDays(new Date(card.startDate), daysShift)
@@ -249,17 +271,61 @@ export function TimelineView({
   return (
     <DragDropProvider manager={manager} onDragEnd={handleDragEnd}>
       <div className="flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-card h-full font-sans">
-        {/* Header */}
-        {onViewTypeChange && onDateChange && (
-          <div className="px-4 pt-4">
-            <TimelineHeader
-              viewType={viewType}
-              currentDate={currentDate}
-              onViewTypeChange={onViewTypeChange}
-              onDateChange={onDateChange}
-            />
+        {/* Unified Global Header */}
+        <div className="flex border-b border-border bg-card divide-x divide-border">
+          {/* Left Header Partition (Scope Controls) */}
+          <div 
+            className="flex items-center gap-2 px-3 shrink-0"
+            style={{ width: SCOPE_WIDTH, height: HEADER_HEIGHT }}
+          >
+            <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-md border border-border/50">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-sm hover:bg-background"
+                onClick={handlePrevious}
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-6 px-2 text-[9px] font-bold uppercase tracking-tighter rounded-sm hover:bg-background"
+                onClick={handleToday}
+              >
+                T
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-sm hover:bg-background"
+                onClick={handleNext}
+              >
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="flex-1 flex items-center justify-between ml-1 overflow-hidden">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">
+                Issue
+              </span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate hidden sm:inline">
+                Status
+              </span>
+            </div>
           </div>
-        )}
+
+          {/* Right Header Partition (Timeline Controls) */}
+          <div className="flex-1 px-4 flex items-center">
+            {onViewTypeChange && (
+              <TimelineHeader
+                viewType={viewType}
+                currentDate={currentDate}
+                zoom={zoom}
+                onViewTypeChange={onViewTypeChange}
+                onZoomChange={setZoom}
+              />
+            )}
+          </div>
+        </div>
 
         {/* Main content */}
         <div className="flex flex-1 overflow-hidden">
@@ -296,6 +362,8 @@ export function TimelineView({
               days={days}
               totalDays={totalDays}
               minDate={minDate}
+              dayWidth={dayWidth}
+              viewType={viewType}
               expandedCols={expandedCols}
               expandedCards={expandedCards}
               expandedUnsetCols={expandedUnsetCols}

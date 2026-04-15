@@ -1,7 +1,7 @@
 import { useDroppable } from "@dnd-kit/react";
 import { Card } from "@/types/board";
 import { TimelineCardBar } from "./TimelineCardBar";
-import { DAY_WIDTH, ROW_HEIGHT } from "../constants";
+import { ROW_HEIGHT } from "../constants";
 
 interface TimelineCardRowProps {
   card: Card;
@@ -10,6 +10,7 @@ interface TimelineCardRowProps {
   onCardClick: (card: Card) => void;
   minDate: Date;
   totalDays: number;
+  dayWidth: number;
   hoveredCardId: string | null;
   setHoveredCardId: (id: string | null) => void;
   isExpanded: boolean;
@@ -23,6 +24,7 @@ export function TimelineCardRow({
   onCardClick,
   minDate,
   totalDays,
+  dayWidth,
   hoveredCardId,
   setHoveredCardId,
   isExpanded,
@@ -48,8 +50,8 @@ export function TimelineCardRow({
           {Array.from({ length: totalDays }).map((_, i) => (
             <div
               key={i}
-              className="border-r border-border/10 h-full"
-              style={{ width: DAY_WIDTH }}
+              className="border-r border-border/10 h-full shrink-0"
+              style={{ width: dayWidth }}
             />
           ))}
         </div>
@@ -76,8 +78,8 @@ export function TimelineCardRow({
                 {Array.from({ length: totalDays }).map((_, i) => (
                   <div
                     key={i}
-                    className="border-r border-border/5 h-full"
-                    style={{ width: DAY_WIDTH }}
+                    className="border-r border-border/5 h-full shrink-0"
+                    style={{ width: dayWidth }}
                   />
                 ))}
               </div>

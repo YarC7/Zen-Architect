@@ -9,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, ZoomIn, ZoomOut } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { TimelineViewType } from "../types";
 import {
   getPreviousDate,
@@ -20,78 +21,54 @@ import {
 interface TimelineHeaderProps {
   viewType: TimelineViewType;
   currentDate: Date;
+  zoom: number;
   onViewTypeChange: (type: TimelineViewType) => void;
   onDateChange: (date: Date) => void;
+  onZoomChange: (zoom: number) => void;
 }
 
 export function TimelineHeader({
   viewType,
   currentDate,
+  zoom,
   onViewTypeChange,
-  onDateChange,
-}: TimelineHeaderProps) {
-  const handlePrevious = () => {
-    onDateChange(getPreviousDate(currentDate, viewType));
-  };
-
-  const handleNext = () => {
-    onDateChange(getNextDate(currentDate, viewType));
-  };
-
-  const handleToday = () => {
-    console.log("Today button clicked, setting date to:", new Date());
-    onDateChange(new Date());
-  };
+  onZoomChange,
+}: Omit<TimelineHeaderProps, "onDateChange">) {
 
   return (
     <div className="flex items-center gap-4 mb-4">
-      <div className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePrevious}
-          className="h-8 px-2"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleNext}
-          className="h-8 px-2"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleToday}
-          className="h-8 gap-1.5"
-        >
-          <CalendarDays className="h-3.5 w-3.5" />
-          <span>Today</span>
-        </Button>
-      </div>
-
-      <div className="text-sm font-medium text-foreground">
+      <div className="text-sm font-semibold text-foreground bg-accent/30 px-3 py-1 rounded-md border border-border/50 shadow-sm ml-auto">
         {getViewLabel(currentDate, viewType)}
       </div>
 
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">View:</span>
         <Select
           value={viewType}
           onValueChange={(value) => onViewTypeChange(value as TimelineViewType)}
         >
-          <SelectTrigger className="h-8 w-24">
+          <SelectTrigger className="h-8 w-[100px] bg-background shadow-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="day">Day</SelectItem>
-            <SelectItem value="week">Week</SelectItem>
-            <SelectItem value="month">Month</SelectItem>
+            <SelectItem value="day">Days</SelectItem>
+            <SelectItem value="week">Weeks</SelectItem>
+            <SelectItem value="month">Months</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 pl-2 border-l border-border ml-2">
+          <ZoomOut className="h-3.5 w-3.5 text-muted-foreground" />
+          <Slider
+            value={[zoom]}
+            min={0.5}
+            max={2}
+            step={0.1}
+            className="w-24 pointer-events-auto"
+            onValueChange={([val]) => onZoomChange(val)}
+          />
+          <ZoomIn className="h-3.5 w-3.5 text-muted-foreground" />
+        </div>
       </div>
     </div>
   );
