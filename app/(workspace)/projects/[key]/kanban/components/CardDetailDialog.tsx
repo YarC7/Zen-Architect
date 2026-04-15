@@ -62,6 +62,7 @@ import { format, isPast, isToday, formatDistanceToNow } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { v4 as uuidv4 } from "uuid";
 import {
   Card,
   LABEL_PRESETS,
@@ -671,7 +672,7 @@ export function CardDetailDialog({
   const addComment = () => {
     if (!newComment.trim()) return;
 
-    const commentId = `comm-${Date.now()}`;
+    const commentId = uuidv4();
     const comment: Comment = {
       id: commentId,
       author: "User",
@@ -680,7 +681,7 @@ export function CardDetailDialog({
     };
 
     const activity: Activity = {
-      id: `act-${Date.now()}`,
+      id: uuidv4(),
       type: "comment",
       user: "User",
       description: `đã bình luận: "${newComment.trim().slice(0, 30)}${newComment.trim().length > 30 ? "..." : ""}"`,
