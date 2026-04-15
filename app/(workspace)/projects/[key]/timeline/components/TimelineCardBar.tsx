@@ -56,7 +56,7 @@ export function TimelineCardBar({
       </TooltipTrigger>
       <TooltipContent
         side="top"
-        className="max-w-[240px] p-0 overflow-hidden border-none shadow-2xl rounded-xl"
+        className="max-w-[240px] p-0 overflow-hidden border-none shadow-2xl rounded-xl bg-white"
         sideOffset={8}
       >
         <div className="flex flex-col">
@@ -65,7 +65,7 @@ export function TimelineCardBar({
             style={{ backgroundColor: statusStyle.bg }}
           />
           <div className="p-4 space-y-2">
-            <h4 className="font-bold text-sm">{card.title}</h4>
+            <h4 className="font-bold text-sm text-black">{card.title}</h4>
             {card.startDate && (
               <p className="text-xs text-muted-foreground">
                 Start: {format(new Date(card.startDate), "dd MMM yyyy")}

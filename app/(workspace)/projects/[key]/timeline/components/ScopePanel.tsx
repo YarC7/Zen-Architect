@@ -1,3 +1,4 @@
+import React from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BoardState, Card } from "@/types/board";
@@ -13,11 +14,13 @@ interface ScopePanelProps {
   board: BoardState;
   expandedCols: Set<string>;
   expandedCards: Set<string>;
+  expandedUnsetCols: Set<string>;
   hoveredCardId: string | null;
   hoveredColId: string | null;
   onCardClick: (card: Card) => void;
   onToggleCol: (colId: string) => void;
   onToggleCard: (cardId: string) => void;
+  onToggleUnset: (colId: string) => void;
   onHoverCol: (colId: string | null) => void;
   onHoverCard: (cardId: string | null) => void;
 }
@@ -26,11 +29,13 @@ export function ScopePanel({
   board,
   expandedCols,
   expandedCards,
+  expandedUnsetCols,
   hoveredCardId,
   hoveredColId,
   onCardClick,
   onToggleCol,
   onToggleCard,
+  onToggleUnset,
   onHoverCol,
   onHoverCard,
 }: ScopePanelProps) {
@@ -41,7 +46,7 @@ export function ScopePanel({
     >
       {/* Header */}
       <div
-        className="flex items-center border-b border-border px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted/20"
+        className="flex items-center border-b border-border px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-card sticky top-0 z-20"
         style={{ height: HEADER_HEIGHT }}
       >
         <span className="w-8">#</span>
@@ -53,6 +58,7 @@ export function ScopePanel({
       <div className="overflow-y-auto flex-1 min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {board.columns.map((col) => {
           const isExpanded = expandedCols.has(col.id);
+          const isUnsetExpanded = expandedUnsetCols.has(col.id);
           const colCards = col.cardIds
             .map((id) => board.cards[id])
             .filter(Boolean);
@@ -81,51 +87,64 @@ export function ScopePanel({
               />
 
               {/* Cards */}
-              {isExpanded && (
-                <>
-                  {cardsWithDates.map((card) => (
-                    <CardRow
-                      key={card.id}
-                      card={card}
-                      colTitle={col.title}
-                      colStatusStyle={colStatusStyle}
-                      isCardExpanded={expandedCards.has(card.id)}
-                      hoveredCardId={hoveredCardId}
-                      onCardClick={onCardClick}
-                      onToggleCard={onToggleCard}
-                      onHoverCard={onHoverCard}
-                    />
-                  ))}
+              <div className="overflow-hidden transition-all duration-300 ease-in-out">
+                {isExpanded && (
+                  <>
+                    {cardsWithDates.map((card) => (
+                      <CardRow
+                        key={card.id}
+                        card={card}
+                        colTitle={col.title}
+                        colStatusStyle={colStatusStyle}
+                        isCardExpanded={expandedCards.has(card.id)}
+                        hoveredCardId={hoveredCardId}
+                        onCardClick={onCardClick}
+                        onToggleCard={onToggleCard}
+                        onHoverCard={onHoverCard}
+                      />
+                    ))}
 
-                  {/* Unset dates section */}
-                  {cardsWithoutDates.length > 0 && (
-                    <div className="bg-muted/10">
-                      <div
-                        className="flex items-center gap-2 px-3 border-b border-border/30 italic text-muted-foreground"
-                        style={{ height: ROW_HEIGHT - 8 }}
-                      >
-                        <span className="w-8 shrink-0" />
-                        <span className="text-[11px] font-medium uppercase tracking-tight">
-                          Chưa thiết lập ({cardsWithoutDates.length})
-                        </span>
+                    {/* Unset dates section */}
+                    {cardsWithoutDates.length > 0 && (
+                      <div className="bg-muted/10 transition-all duration-300 ease-in-out">
+                        <div
+                          className="flex items-center gap-2 px-3 border-b border-border/30 italic text-muted-foreground cursor-pointer hover:bg-muted/20 transition-colors group"
+                          style={{ height: ROW_HEIGHT - 8 }}
+                          onClick={() => onToggleUnset(col.id)}
+                        >
+                          <span className="w-8 shrink-0" />
+                          <span className="text-[11px] font-medium uppercase tracking-tight flex-1">
+                            Chưa thiết lập ({cardsWithoutDates.length})
+                          </span>
+                          <div className="p-0.5 opacity-60 group-hover:opacity-100 transition-opacity pr-2">
+                            {isUnsetExpanded ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                          </div>
+                        </div>
+                        <div className="overflow-hidden transition-all duration-300 ease-in-out">
+                          {isUnsetExpanded &&
+                            cardsWithoutDates.map((card) => (
+                              <CardRow
+                                key={card.id}
+                                card={card}
+                                colTitle={col.title}
+                                colStatusStyle={colStatusStyle}
+                                isCardExpanded={expandedCards.has(card.id)}
+                                hoveredCardId={hoveredCardId}
+                                onCardClick={onCardClick}
+                                onToggleCard={onToggleCard}
+                                onHoverCard={onHoverCard}
+                              />
+                            ))}
+                        </div>
                       </div>
-                      {cardsWithoutDates.map((card) => (
-                        <CardRow
-                          key={card.id}
-                          card={card}
-                          colTitle={col.title}
-                          colStatusStyle={colStatusStyle}
-                          isCardExpanded={expandedCards.has(card.id)}
-                          hoveredCardId={hoveredCardId}
-                          onCardClick={onCardClick}
-                          onToggleCard={onToggleCard}
-                          onHoverCard={onHoverCard}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}

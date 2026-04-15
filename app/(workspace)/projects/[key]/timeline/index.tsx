@@ -72,6 +72,9 @@ export function TimelineView({
     () => new Set(board.columns.map((c) => c.id)),
   );
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [expandedUnsetCols, setExpandedUnsetCols] = useState<Set<string>>(
+    new Set(),
+  );
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [hoveredColId, setHoveredColId] = useState<string | null>(null);
 
@@ -152,7 +155,7 @@ export function TimelineView({
     }
   }, [minDate]);
 
-  // Synchronized scrolling
+  // Sync scroll logic with requestAnimationFrame for maximum performance
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (leftPanelRef.current) {
       leftPanelRef.current.scrollTop = e.currentTarget.scrollTop;
@@ -234,6 +237,15 @@ export function TimelineView({
     });
   }, []);
 
+  const toggleUnset = useCallback((colId: string) => {
+    setExpandedUnsetCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      return next;
+    });
+  }, []);
+
   return (
     <DragDropProvider manager={manager} onDragEnd={handleDragEnd}>
       <div className="flex-1 flex flex-col overflow-hidden border border-border rounded-lg bg-card h-full font-sans">
@@ -254,18 +266,20 @@ export function TimelineView({
           {/* Left scope panel */}
           <div
             ref={leftPanelRef}
-            className="overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out"
             onScroll={handleLeftPanelScroll}
           >
             <ScopePanel
               board={board}
               expandedCols={expandedCols}
               expandedCards={expandedCards}
+              expandedUnsetCols={expandedUnsetCols}
               hoveredCardId={hoveredCardId}
               hoveredColId={hoveredColId}
               onCardClick={onCardClick}
               onToggleCol={toggleCol}
               onToggleCard={toggleCard}
+              onToggleUnset={toggleUnset}
               onHoverCol={setHoveredColId}
               onHoverCard={setHoveredCardId}
             />
@@ -275,7 +289,7 @@ export function TimelineView({
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-auto"
+            className="flex-1 overflow-auto transition-all duration-300 ease-in-out"
           >
             <TimelinePanel
               board={board}
@@ -284,6 +298,7 @@ export function TimelineView({
               minDate={minDate}
               expandedCols={expandedCols}
               expandedCards={expandedCards}
+              expandedUnsetCols={expandedUnsetCols}
               hoveredCardId={hoveredCardId}
               hoveredColId={hoveredColId}
               onCardClick={onCardClick}

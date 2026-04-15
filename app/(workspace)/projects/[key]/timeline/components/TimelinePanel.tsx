@@ -16,6 +16,7 @@ interface TimelinePanelProps {
   minDate: Date;
   expandedCols: Set<string>;
   expandedCards: Set<string>;
+  expandedUnsetCols: Set<string>;
   hoveredCardId: string | null;
   hoveredColId: string | null;
   onCardClick: (card: Card) => void;
@@ -32,6 +33,7 @@ export function TimelinePanel({
   minDate,
   expandedCols,
   expandedCards,
+  expandedUnsetCols,
   hoveredCardId,
   hoveredColId,
   onCardClick,
@@ -49,6 +51,7 @@ export function TimelinePanel({
         board={board}
         expandedCols={expandedCols}
         expandedCards={expandedCards}
+        expandedUnsetCols={expandedUnsetCols}
         hoveredCardId={hoveredCardId}
         hoveredColId={hoveredColId}
         onCardClick={onCardClick}
@@ -178,6 +181,7 @@ interface CardRowsProps {
   board: BoardState;
   expandedCols: Set<string>;
   expandedCards: Set<string>;
+  expandedUnsetCols: Set<string>;
   hoveredCardId: string | null;
   hoveredColId: string | null;
   onCardClick: (card: Card) => void;
@@ -192,6 +196,7 @@ function CardRows({
   board,
   expandedCols,
   expandedCards,
+  expandedUnsetCols,
   hoveredCardId,
   hoveredColId,
   onCardClick,
@@ -205,10 +210,18 @@ function CardRows({
     <div>
       {board.columns.map((col) => {
         const isExpanded = expandedCols.has(col.id);
+        const isUnsetExpanded = expandedUnsetCols.has(col.id);
         const colCards = col.cardIds
           .map((id) => board.cards[id])
           .filter(Boolean);
         const statusStyle = getStatusStyle(col.title);
+
+        const cardsWithDates = colCards.filter(
+          (card) => card.startDate || card.dueDate,
+        );
+        const cardsWithoutDates = colCards.filter(
+          (card) => !card.startDate && !card.dueDate,
+        );
 
         return (
           <div key={col.id}>
@@ -228,27 +241,74 @@ function CardRows({
                 ))}
               </div>
             </div>
-            {isExpanded &&
-              colCards.map((card) => {
-                const pos = getBarPosition(card);
-                if (!pos) return null;
+            <div className="overflow-hidden transition-all duration-300 ease-in-out">
+              {isExpanded && (
+                <>
+                  {cardsWithDates.map((card) => {
+                    const pos = getBarPosition(card);
+                    if (!pos) return null;
 
-                return (
-                  <TimelineCardRow
-                    key={card.id}
-                    card={card}
-                    pos={pos}
-                    statusStyle={statusStyle}
-                    onCardClick={onCardClick}
-                    minDate={minDate}
-                    totalDays={totalDays}
-                    hoveredCardId={hoveredCardId}
-                    setHoveredCardId={onHoverCard}
-                    isExpanded={expandedCards.has(card.id)}
-                    onToggleExpand={onToggleCard}
-                  />
-                );
-              })}
+                    return (
+                      <TimelineCardRow
+                        key={card.id}
+                        card={card}
+                        pos={pos}
+                        statusStyle={statusStyle}
+                        onCardClick={onCardClick}
+                        minDate={minDate}
+                        totalDays={totalDays}
+                        hoveredCardId={hoveredCardId}
+                        setHoveredCardId={onHoverCard}
+                        isExpanded={expandedCards.has(card.id)}
+                        onToggleExpand={onToggleCard}
+                      />
+                    );
+                  })}
+
+                  {/* Spacer for "Chưa thiết lập" section */}
+                  {cardsWithoutDates.length > 0 && (
+                    <>
+                      <div
+                        className="border-b border-border/10 bg-muted/5 transition-all duration-300 ease-in-out"
+                        style={{ height: ROW_HEIGHT - 8 }}
+                      >
+                        <div className="flex h-full pointer-events-none opacity-20">
+                          {Array.from({ length: totalDays }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="border-r border-border/20 h-full"
+                              style={{ width: DAY_WIDTH }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="overflow-hidden transition-all duration-300 ease-in-out">
+                        {isUnsetExpanded &&
+                          cardsWithoutDates.map((card) => (
+                            <div
+                              key={`unset-spacer-${card.id}`}
+                              className="border-b border-border/5 bg-muted/5"
+                              style={{ height: ROW_HEIGHT }}
+                            >
+                              <div className="flex h-full pointer-events-none opacity-10">
+                                {Array.from({ length: totalDays }).map(
+                                  (_, i) => (
+                                    <div
+                                      key={i}
+                                      className="border-r border-border/20 h-full"
+                                      style={{ width: DAY_WIDTH }}
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         );
       })}
