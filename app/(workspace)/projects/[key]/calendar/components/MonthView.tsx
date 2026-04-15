@@ -271,8 +271,8 @@ function WeekRow({
     return { layout: cardPositions, totalRows: rows.length };
   }, [spanning, gridColumn, week, showWeekends]);
 
-  const spanningCardRowHeight = 28; // px per spanning card row
-  const spanningSectionHeight = Math.max(spanningLayout.totalRows * spanningCardRowHeight, 28);
+  const spanningCardRowHeight = 36; // px per spanning card row
+  const spanningSectionHeight = Math.max(spanningLayout.totalRows * spanningCardRowHeight, 36);
 
   return (
     <div
@@ -408,12 +408,12 @@ function DraggableSpanningCard({
       }}
     >
       <div
-        className="h-1 w-8 rounded-full mt-1 ml-1 shrink-0"
+        className="h-1.5 w-8 rounded-full mt-1 ml-1 shrink-0"
         style={{
           backgroundColor: `hsl(${barColor})`,
         }}
       />
-      <div className="min-w-0 px-2">
+      <div className="min-w-0 px-2 py-1">
         <span
           className={`block min-w-0 truncate text-xs leading-snug ${isCompleted
               ? "line-through text-muted-foreground"

@@ -24,14 +24,14 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
     .select("*")
     .eq("key", projectKey)
     .single()) as {
-    data: {
-      id: string;
-      title: string;
-      background_type: string;
-      background_value: string;
-    } | null;
-    error: Error | null;
-  };
+      data: {
+        id: string;
+        title: string;
+        background_type: string;
+        background_value: string;
+      } | null;
+      error: Error | null;
+    };
 
   if (projectError) throw projectError;
   if (!project) throw new Error(`Project not found: ${projectKey}`);

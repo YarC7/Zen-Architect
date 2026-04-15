@@ -271,7 +271,7 @@ export function useBoardForProject(projectKey: string) {
           columns: prev.columns.map((c) =>
             c.id === colId ? { ...c, cardIds: [...c.cardIds, cardId] } : c,
           ),
-          activities: [...prev.activities, activity],
+          activities: [activity, ...(prev.activities || [])],
         };
       });
     },

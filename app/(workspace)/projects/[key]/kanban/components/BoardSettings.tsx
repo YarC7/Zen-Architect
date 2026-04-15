@@ -141,6 +141,28 @@ export function BoardSettings({
   );
   const [imageUrl, setImageUrl] = useState("");
 
+  // Edit label state
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editLabelName, setEditLabelName] = useState("");
+  const [editLabelColor, setEditLabelColor] = useState("0 84% 60%");
+
+  const startEditLabel = (label: Label) => {
+    setEditingLabelId(label.id);
+    setEditLabelName(label.name);
+    setEditLabelColor(label.color);
+  };
+
+  const saveEditLabel = () => {
+    if (editingLabelId && editLabelName.trim()) {
+      onUpdateLabel(editingLabelId, editLabelName.trim(), editLabelColor);
+    }
+    setEditingLabelId(null);
+  };
+
+  const cancelEditLabel = () => {
+    setEditingLabelId(null);
+  };
+
   const handleAddLabel = () => {
     if (newLabelName.trim()) {
       onAddLabel(newLabelName.trim(), newLabelColor);
@@ -339,31 +361,87 @@ export function BoardSettings({
 
             <ScrollArea className="h-[300px]">
               <div className="space-y-2">
-                {labels.map((label) => (
-                  <div
-                    key={label.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-muted"
-                  >
-                    <Badge
-                      style={{
-                        backgroundColor: `hsl(${label.color} / 0.2)`,
-                        color: `hsl(${label.color})`,
-                      }}
+                {labels.map((label) =>
+                  editingLabelId === label.id ? (
+                    // Inline edit mode
+                    <div
+                      key={label.id}
+                      className="flex items-center gap-2 p-2 rounded-lg border border-primary bg-muted"
                     >
-                      {label.name}
-                    </Badge>
-                    <div className="flex gap-1">
+                      <Input
+                        className="h-8 flex-1"
+                        value={editLabelName}
+                        onChange={(e) => setEditLabelName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEditLabel();
+                          if (e.key === "Escape") cancelEditLabel();
+                        }}
+                        autoFocus
+                      />
+                      <Input
+                        type="color"
+                        className="w-10 h-8 p-0.5 cursor-pointer"
+                        value={`#${parseInt(editLabelColor.split(" ")[0]).toString(16).padStart(2, "0")}8080`}
+                        onChange={(e) => {
+                          const hex = e.target.value;
+                          const r = parseInt(hex.slice(1, 3), 16);
+                          const g = parseInt(hex.slice(3, 5), 16);
+                          const b = parseInt(hex.slice(5, 7), 16);
+                          const h = Math.round(
+                            (r / 255) * 100 * 0.3 +
+                              (g / 255) * 100 * 0.59 +
+                              (b / 255) * 100 * 0.11,
+                          );
+                          setEditLabelColor(`${h} 84% 60%`);
+                        }}
+                      />
+                      <Button size="sm" className="h-8" onClick={saveEditLabel}>
+                        Save
+                      </Button>
                       <Button
+                        size="sm"
                         variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => onDeleteLabel(label.id)}
+                        className="h-8"
+                        onClick={cancelEditLabel}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-                ))}
+                  ) : (
+                    // Display mode
+                    <div
+                      key={label.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-muted"
+                    >
+                      <Badge
+                        style={{
+                          backgroundColor: `hsl(${label.color} / 0.2)`,
+                          color: `hsl(${label.color})`,
+                        }}
+                      >
+                        {label.name}
+                      </Badge>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => startEditLabel(label)}
+                        >
+                          <span className="text-xs">✏️</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onDeleteLabel(label.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ),
+                )}
               </div>
             </ScrollArea>
           </TabsContent>

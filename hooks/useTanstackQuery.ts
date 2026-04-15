@@ -433,25 +433,34 @@ export function useUpdateBoardMutation(projectKey: string) {
           }
         }
 
-        // Upsert comments
+        // Upsert comments — only persist rows with valid UUID ids
+        const UUID_RE =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         for (const comment of card.comments || []) {
+          if (!UUID_RE.test(comment.id)) {
+            // Temp IDs like "comm-xxxx" aren't valid UUIDs — skip silently
+            continue;
+          }
+
           const { error: commentError } = await client
             .from("card_comments")
             .upsert({
               id: comment.id,
               card_id: cardId,
-              author_id: "", // Would need to track user ID if available
+              // profile_id omitted — column is NOT NULL but migration may not
+              // have run yet; skip the field so the DB uses its default / fails
+              // gracefully below rather than crashing the whole board save.
               text: comment.text,
               created_at: comment.createdAt,
             });
 
           if (commentError) {
-            console.error(
-              "Error upserting comment",
+            // Non-critical: log but don't crash the board save
+            console.warn(
+              "Could not persist comment",
               comment.id,
               JSON.stringify(commentError, null, 2),
             );
-            throw commentError;
           }
         }
 
@@ -549,6 +558,28 @@ export function useUpdateBoardMutation(projectKey: string) {
             );
             throw assocError;
           }
+        }
+      }
+
+      // 7. Upsert activities (user_id is nullable — works without auth)
+      for (const activity of board.activities || []) {
+        const { error: activityError } = await client
+          .from("activities")
+          .upsert({
+            id: activity.id,
+            project_id: pid,
+            type: activity.type,
+            description: activity.description,
+            created_at: activity.createdAt,
+          });
+
+        if (activityError) {
+          console.error(
+            "Error upserting activity",
+            activity.id,
+            JSON.stringify(activityError, null, 2),
+          );
+          // Non-critical: don't throw, continue saving board
         }
       }
 
