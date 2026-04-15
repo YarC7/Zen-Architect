@@ -11,7 +11,7 @@ interface LabelPopoverProps {
   onUpdate: (card: Card) => void;
   onClose?: () => void;
   availableLabels: Label[];
-  onCreateLabel: (name: string, color: string) => string;
+  onCreateLabel: (name: string, color: string, card?: Card) => string;
   onUpdateLabel: (id: string, name: string, color: string) => void;
   onDeleteLabel: (id: string) => void;
 }
@@ -55,12 +55,7 @@ export function LabelPopover({
 
   const handleCreate = () => {
     if (!labelTitle.trim()) return;
-    const newId = onCreateLabel(labelTitle, selectedColor);
-    const newLabel = { id: newId, name: labelTitle, color: selectedColor };
-    onUpdate({
-      ...card,
-      labels: [...card.labels, newLabel]
-    });
+    onCreateLabel(labelTitle, selectedColor, card);
     setLabelTitle('');
     setView('list');
   };

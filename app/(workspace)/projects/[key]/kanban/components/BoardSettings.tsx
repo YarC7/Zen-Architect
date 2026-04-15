@@ -111,7 +111,7 @@ interface BoardSettingsProps {
   background: BoardBackground;
   onBackgroundChange: (background: BoardBackground) => void;
   labels: Label[];
-  onAddLabel: (name: string, color: string) => void;
+  onAddLabel: (name: string, color: string, card?: Card) => void;
   onUpdateLabel: (id: string, name: string, color: string) => void;
   onDeleteLabel: (id: string) => void;
   archivedCards: Record<string, Card>;

@@ -56,6 +56,7 @@ import {
   Archive,
   CheckCircle2,
   Check,
+  Loader2,
 } from "lucide-react";
 import { format, isPast, isToday, formatDistanceToNow } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -69,7 +70,9 @@ import {
   Activity,
   ASSIGNEE_COLORS,
   Label,
+  Assignee,
 } from "@/types/board";
+import { useProfilesQuery } from "@/hooks/useTanstackQuery";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,8 +132,8 @@ function DatePopover({
   const saveDates = () => {
     const normalizedDueDate =
       hasDueDate &&
-      selectedDate &&
-      (!selectedStartDate || selectedDate >= selectedStartDate)
+        selectedDate &&
+        (!selectedStartDate || selectedDate >= selectedStartDate)
         ? selectedDate
         : null;
 
@@ -448,25 +451,13 @@ interface CardDetailDialogProps {
   onDelete: (cardId: string) => void;
   onAddAssignee: (cardId: string, name: string) => void;
   labels: Label[];
-  onAddLabel: (name: string, color: string) => string;
+  onAddLabel: (name: string, color: string, card?: Card) => string;
   onUpdateLabel: (id: string, name: string, color: string) => void;
   onDeleteLabel: (id: string) => void;
   onAddActivity?: (activity: Omit<Activity, "id" | "createdAt">) => void;
 }
 
 let checkId = Date.now();
-
-// Mock board members (normally would come from props/context)
-const BOARD_MEMBERS = [
-  {
-    id: "1",
-    name: "Nguyễn Đức Cảnh",
-    initials: "NC",
-    color: ASSIGNEE_COLORS[0],
-  },
-  { id: "2", name: "Admin Zenarc", initials: "AZ", color: ASSIGNEE_COLORS[1] },
-  { id: "3", name: "Trần Văn A", initials: "VA", color: ASSIGNEE_COLORS[2] },
-];
 
 function MemberPopoverContent({
   card,
@@ -476,12 +467,13 @@ function MemberPopoverContent({
   onUpdate: (c: Card) => void;
 }) {
   const [search, setSearch] = useState("");
+  const { data: members, isLoading } = useProfilesQuery();
 
-  const filtered = BOARD_MEMBERS.filter((m) =>
+  const filtered = (members || []).filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const toggleMember = (member: (typeof BOARD_MEMBERS)[0]) => {
+  const toggleMember = (member: Assignee) => {
     const exists = card.assignees.some((a) => a.id === member.id);
     if (exists) {
       onUpdate({
@@ -491,10 +483,7 @@ function MemberPopoverContent({
     } else {
       onUpdate({
         ...card,
-        assignees: [
-          ...card.assignees,
-          { id: member.id, name: member.name, color: member.color },
-        ],
+        assignees: [...card.assignees, member],
       });
     }
   };
@@ -515,40 +504,62 @@ function MemberPopoverContent({
           />
         </div>
 
-        <div className="space-y-4">
-          <p className="text-xs font-bold text-muted-foreground/80 px-1 uppercase tracking-tight">
-            Thành viên của bảng
-          </p>
-          <div className="space-y-1">
-            {filtered.map((member) => {
-              const isActive = card.assignees.some((a) => a.id === member.id);
-              return (
-                <div
-                  key={member.id}
-                  onClick={() => toggleMember(member)}
-                  className={cn(
-                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all hover:bg-muted text-sm group",
-                    isActive && "bg-muted/50",
-                  )}
-                >
-                  <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white shadow-sm ring-1 ring-white/10 group-hover:ring-white/20 transition-all">
-                    {member.initials}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-foreground">
-                      {member.name}
-                    </p>
-                  </div>
-                  {isActive && (
-                    <div className="h-5 w-5 bg-primary/10 rounded-full flex items-center justify-center">
-                      <div className="h-2 w-2 bg-primary rounded-full animate-in zoom-in-50 duration-200" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        {isLoading ? (
+          <div className="flex h-20 items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        </div>
+        ) : (
+          <div className="space-y-4 overflow-y">
+            <p className="text-xs font-bold text-muted-foreground/80 px-1 uppercase tracking-tight">
+              Thành viên của bảng
+            </p>
+            <div className="space-y-1">
+              {filtered.length === 0 ? (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  Không tìm thấy thành viên
+                </p>
+              ) : (
+                filtered.map((member) => {
+                  const isActive = card.assignees.some(
+                    (a) => a.id === member.id,
+                  );
+                  return (
+                    <div
+                      key={member.id}
+                      onClick={() => toggleMember(member)}
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all hover:bg-muted text-sm group overflow-auto",
+                        isActive && "bg-muted/50",
+                      )}
+                    >
+                      <div
+                        className="h-10 w-10 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ring-1 ring-white/10 group-hover:ring-white/20 transition-all"
+                        style={{ backgroundColor: `hsl(${member.color})` }}
+                      >
+                        {member.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">
+                          {member.name}
+                        </p>
+                      </div>
+                      {isActive && (
+                        <div className="h-5 w-5 bg-primary/10 rounded-full flex items-center justify-center">
+                          <div className="h-2 w-2 bg-primary rounded-full animate-in zoom-in-50 duration-200" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -686,44 +697,6 @@ export function CardDetailDialog({
     setNewComment("");
   };
 
-  const mockComments: Comment[] = [
-    {
-      id: "c1",
-      author: "Alice",
-      text: "I completed the initial repository setup. Please check the CI pipeline.",
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: "c2",
-      author: "Bob",
-      text: "Looks good! I will start on the landing page mockup tomorrow.",
-      createdAt: new Date(Date.now() - 7200000).toISOString(),
-    },
-  ];
-
-  const mockActivities: Activity[] = [
-    {
-      id: "a1",
-      user: "Alice",
-      description: "created this card",
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      type: "create",
-    },
-    {
-      id: "a2",
-      user: "Admin",
-      description: "added Alice to this card",
-      createdAt: new Date(Date.now() - 43200000).toISOString(),
-      type: "update",
-    },
-    {
-      id: "a3",
-      user: "Bob",
-      description: "moved this card to In Progress",
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-      type: "move",
-    },
-  ];
 
   const feedItems = [
     ...(card.comments || []).map((c) => ({
@@ -985,7 +958,7 @@ export function CardDetailDialog({
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent
-                        className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                        className="w-[400px] max-h-[400px] p-0 shadow-2xl border-muted/60 rounded-xl"
                         align="center"
                         side="bottom"
                         sideOffset={10}
@@ -1054,7 +1027,7 @@ export function CardDetailDialog({
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent
-                            className="w-[300px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-hidden"
+                            className="w-[600px]  max-h-[400px] p-0 shadow-2xl border-muted/60 rounded-xl overflow-auto"
                             align="center"
                             side="right"
                             sideOffset={12}
@@ -1206,7 +1179,7 @@ export function CardDetailDialog({
                           className={cn(
                             "text-sm flex-1 break-words transition-all duration-300",
                             item.checked &&
-                              "line-through text-muted-foreground opacity-60",
+                            "line-through text-muted-foreground opacity-60",
                           )}
                         >
                           {item.text}

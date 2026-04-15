@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useBoardForProject } from "@/hooks/useBoardForProject";
+import { useBoardRealtime } from "@/hooks/useBoardRealtime";
 import { filterCards, getAllAssignees } from "@/utils/filters";
 import { getBackgroundStyle } from "@/utils/styles";
 
@@ -26,6 +27,9 @@ export default function ProjectDetail() {
   const params = useParams<{ key: string }>();
   const id = params?.key;
   const router = useRouter();
+
+  // Subscribe to real-time updates from Supabase
+  useBoardRealtime(id || "");
 
   const {
     board,
@@ -203,21 +207,21 @@ export default function ProjectDetail() {
       </div>
 
       {activeView === "kanban" && (
-        <KanbanBoard
-          board={board}
-          filteredCardIds={filteredCardIds}
-          openCard={openCard}
-          updateCard={updateCard}
-          setBoard={setBoard}
-          renameColumn={renameColumn}
-          deleteColumn={deleteColumn}
-          addCard={addCard}
-          setColumnColor={setColumnColor}
-          copyColumn={copyColumn}
-          moveAllCards={moveAllCards}
-          archiveAllCards={archiveAllCards}
-          addColumn={addColumn}
-        />
+          <KanbanBoard
+            board={board}
+            filteredCardIds={filteredCardIds}
+            openCard={openCard}
+            updateCard={updateCard}
+            setBoard={setBoard}
+            renameColumn={renameColumn}
+            deleteColumn={deleteColumn}
+            addCard={addCard}
+            setColumnColor={setColumnColor}
+            copyColumn={copyColumn}
+            moveAllCards={moveAllCards}
+            archiveAllCards={archiveAllCards}
+            addColumn={addColumn}
+          />
       )}
 
       {activeView === "list" && (

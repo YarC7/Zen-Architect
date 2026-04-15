@@ -334,7 +334,7 @@ export const KanbanColumn = memo(function KanbanColumn({
               id={`new-card-${column.id}`}
               autoFocus
               placeholder="Enter card title..."
-              className="h-8 text-sm"
+              className="h-8 text-sm bg-white"
               value={newCardTitle}
               onChange={(e) => setNewCardTitle(e.target.value)}
               onKeyDown={(e) => {

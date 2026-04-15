@@ -64,6 +64,7 @@ export interface BoardBackground {
 }
 
 export interface BoardState {
+  projectId: string;
   title: string;
   background: BoardBackground;
   columns: Column[];
@@ -92,8 +93,9 @@ export const ASSIGNEE_COLORS = [
 ];
 
 export const DEFAULT_BOARD: BoardState = {
+  projectId: '',
   title: 'My Project Board',
-  background: { type: 'color', value: '#f8fafc' },
+  background: { type: 'color', value: '#ffffff' },
   labels: LABEL_PRESETS,
   archivedCards: {},
   activities: [],

@@ -1,31 +1,63 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { v4 as uuidv4 } from "uuid";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BoardState,
   Card,
+  Column,
+  Label,
   ASSIGNEE_COLORS,
   BoardBackground,
   Activity,
+  Assignee,
 } from "@/types/board";
-import { useBoardQuery, useUpdateBoardMutation } from "./useTanstackQuery";
+import {
+  useBoardQuery,
+  useUpdateBoardMutation,
+  boardKeys,
+} from "./useTanstackQuery";
 import { DEFAULT_COLUMN_COLORS } from "@/constants/app";
 
-let idCounter = Date.now();
-function genId(prefix: string) {
-  return `${prefix}-${++idCounter}`;
+/**
+ * Generate a UUID v4 for database entities that require proper UUID format.
+ * Supabase schema requires UUID primary keys, not string IDs like "col-123".
+ */
+function genId(): string {
+  return uuidv4();
 }
 
-export function useBoardForProject(projectId: string) {
-  const { data: board, isLoading } = useBoardQuery(projectId);
-  const updateBoardMutation = useUpdateBoardMutation(projectId);
+export function useBoardForProject(projectKey: string) {
+  const queryClient = useQueryClient();
+  const { data: board, isLoading } = useBoardQuery(projectKey);
+  const updateBoardMutation = useUpdateBoardMutation(projectKey);
+  const pendingUpdateRef = useRef<NodeJS.Timeout | null>(null);
 
   const setBoard = useCallback(
     (updater: BoardState | ((prev: BoardState) => BoardState)) => {
-      if (!board) return;
+      // Read current state from queryClient for initial calculation
+      const currentBoard = queryClient.getQueryData<BoardState>(
+        boardKeys.detail(projectKey),
+      );
+      if (!currentBoard) return;
+
       const nextBoard =
-        typeof updater === "function" ? updater(board) : updater;
-      updateBoardMutation.mutate(nextBoard);
+        typeof updater === "function" ? updater(currentBoard) : updater;
+
+      // 1. Update the cache OPTIMISTICALLY immediately for a fluid UI
+      queryClient.setQueryData(boardKeys.detail(projectKey), nextBoard);
+
+      // 2. Clear any existing pending mutation
+      if (pendingUpdateRef.current) {
+        clearTimeout(pendingUpdateRef.current);
+      }
+
+      // 3. Debounce the actual network mutation
+      pendingUpdateRef.current = setTimeout(() => {
+        updateBoardMutation.mutate(nextBoard);
+        pendingUpdateRef.current = null;
+      }, 300);
     },
-    [board, updateBoardMutation],
+    [updateBoardMutation, projectKey, queryClient],
   );
 
   const setBoardTitle = useCallback(
@@ -42,7 +74,7 @@ export function useBoardForProject(projectId: string) {
         columns: [
           ...prev.columns,
           {
-            id: genId("col"),
+            id: genId(),
             title,
             color:
               DEFAULT_COLUMN_COLORS[
@@ -61,7 +93,7 @@ export function useBoardForProject(projectId: string) {
       setBoard((prev) => {
         const oldCol = prev.columns.find((c) => c.id === colId);
         const activity: Activity = {
-          id: genId("activity"),
+          id: genId(),
           type: "update",
           user: "User",
           description: `Đã đổi tên cột "${oldCol?.title}" thành "${title}"`,
@@ -97,14 +129,14 @@ export function useBoardForProject(projectId: string) {
         const col = prev.columns.find((c) => c.id === colId);
         if (!col) return prev;
 
-        const newColId = genId("col");
+        const newColId = genId();
         const newCardIds: string[] = [];
         const newCards = { ...prev.cards };
 
         col.cardIds.forEach((cardId) => {
           const card = prev.cards[cardId];
           if (card) {
-            const newCardId = genId("card");
+            const newCardId = genId();
             newCardIds.push(newCardId);
             newCards[newCardId] = { ...card, id: newCardId };
           }
@@ -161,7 +193,15 @@ export function useBoardForProject(projectId: string) {
         if (!col) return prev;
 
         const newCards = { ...prev.cards };
-        col.cardIds.forEach((id) => delete newCards[id]);
+        const newArchivedCards = { ...prev.archivedCards };
+
+        col.cardIds.forEach((id) => {
+          const card = newCards[id];
+          if (card) {
+            newArchivedCards[id] = { ...card };
+            delete newCards[id];
+          }
+        });
 
         return {
           ...prev,
@@ -169,6 +209,7 @@ export function useBoardForProject(projectId: string) {
             c.id === colId ? { ...c, cardIds: [] } : c,
           ),
           cards: newCards,
+          archivedCards: newArchivedCards,
         };
       });
     },
@@ -193,7 +234,7 @@ export function useBoardForProject(projectId: string) {
 
   const addCard = useCallback(
     (colId: string, title: string) => {
-      const cardId = genId("card");
+      const cardId = genId();
       const card: Card = {
         id: cardId,
         title,
@@ -208,7 +249,7 @@ export function useBoardForProject(projectId: string) {
         completed: false,
         activities: [
           {
-            id: genId("activity"),
+            id: genId(),
             type: "create",
             user: "User",
             description: `Tạo thẻ "${title}"`,
@@ -218,7 +259,7 @@ export function useBoardForProject(projectId: string) {
       };
       setBoard((prev) => {
         const activity: Activity = {
-          id: genId("activity"),
+          id: genId(),
           type: "create",
           user: "User",
           description: `Đã thêm thẻ "${title}" vào cột "${prev.columns.find((c) => c.id === colId)?.title || "Unknown"}"`,
@@ -252,7 +293,7 @@ export function useBoardForProject(projectId: string) {
         if (isNewComment) {
           const newComment = card.comments![card.comments!.length - 1];
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "comment",
             user: "User",
             description: `đã bình luận trên "${card.title}": ${newComment.text}`,
@@ -266,7 +307,7 @@ export function useBoardForProject(projectId: string) {
         // 2. Check for completion toggle
         if (card.completed !== oldCard.completed) {
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "update",
             user: "User",
             description: card.completed
@@ -288,7 +329,7 @@ export function useBoardForProject(projectId: string) {
 
         if (addedLabel || removedLabel) {
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "update",
             user: "User",
             description: addedLabel
@@ -324,7 +365,7 @@ export function useBoardForProject(projectId: string) {
               : `đã mở lại tác vụ "${completionChangedItem.text}" trong "${card.title}"`;
 
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "update",
             user: "User",
             description,
@@ -344,7 +385,7 @@ export function useBoardForProject(projectId: string) {
 
         if (addedAssignee || removedAssignee) {
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "update",
             user: "User",
             description: addedAssignee
@@ -372,7 +413,7 @@ export function useBoardForProject(projectId: string) {
             description = `đã gỡ ngày bắt đầu khỏi "${card.title}"`;
 
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "update",
             user: "User",
             description,
@@ -403,7 +444,7 @@ export function useBoardForProject(projectId: string) {
         delete newCards[cardId];
 
         const activity: Activity = {
-          id: genId("activity"),
+          id: genId(),
           type: "update",
           user: "User",
           description: `Đã xóa thẻ "${card?.title || "không tên"}"`,
@@ -437,7 +478,7 @@ export function useBoardForProject(projectId: string) {
             ...prev.cards,
             [cardId]: {
               ...card,
-              assignees: [...card.assignees, { id: genId("a"), name, color }],
+              assignees: [...card.assignees, { id: genId(), name, color }],
             },
           },
         };
@@ -477,7 +518,7 @@ export function useBoardForProject(projectId: string) {
         if (fromColId !== toColId) {
           const description = `đã chuyển "${card.title}" từ "${fromCol.title}" sang "${toCol.title}"`;
           const activity: Activity = {
-            id: genId("activity"),
+            id: genId(),
             type: "move",
             user: "User",
             description,
@@ -514,12 +555,28 @@ export function useBoardForProject(projectId: string) {
   );
 
   const addLabel = useCallback(
-    (name: string, color: string) => {
-      const id = genId("label");
-      setBoard((prev) => ({
-        ...prev,
-        labels: [...(prev.labels || []), { id, name, color }],
-      }));
+    (name: string, color: string, cardToAssign?: Card) => {
+      const id = genId();
+      const newLabel = { id, name, color };
+      setBoard((prev) => {
+        const newLabels = [...(prev.labels || []), newLabel];
+        let newCards = prev.cards;
+
+        if (cardToAssign) {
+          const card = prev.cards[cardToAssign.id];
+          if (card) {
+            newCards = {
+              ...prev.cards,
+              [cardToAssign.id]: {
+                ...card,
+                labels: [...card.labels, newLabel],
+              },
+            };
+          }
+        }
+
+        return { ...prev, labels: newLabels, cards: newCards };
+      });
       return id;
     },
     [setBoard],
@@ -582,7 +639,7 @@ export function useBoardForProject(projectId: string) {
         if (!card) return prev;
         const { [cardId]: _, ...remainingCards } = prev.cards;
         const activity: Activity = {
-          id: genId("activity"),
+          id: genId(),
           type: "delete",
           user: "User",
           description: `Archived card "${card.title}"`,
@@ -611,7 +668,7 @@ export function useBoardForProject(projectId: string) {
         const { [cardId]: _, ...remainingArchived } = prev.archivedCards;
         const firstColumn = prev.columns[0];
         const activity: Activity = {
-          id: genId("activity"),
+          id: genId(),
           type: "create",
           user: "User",
           description: `Restored card "${card.title}"`,
@@ -651,7 +708,7 @@ export function useBoardForProject(projectId: string) {
           ...prev.activities,
           {
             ...activity,
-            id: genId("activity"),
+            id: genId(),
             createdAt: new Date().toISOString(),
           },
         ],

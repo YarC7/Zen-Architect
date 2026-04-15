@@ -1,9 +1,11 @@
 import { useCallback, useMemo } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { Project } from "@/types/project";
 import { BoardState, DEFAULT_BOARD } from "@/types/board";
 import {
   useProjectsQuery,
   useUpdateProjectsMutation,
+  useDeleteProjectMutation,
 } from "./useTanstackQuery";
 
 const BOARD_KEY_PREFIX = "kanban-board-";
@@ -22,23 +24,24 @@ export function saveIndex(projects: Project[]) {
   localStorage.setItem(INDEX_KEY, JSON.stringify(projects));
 }
 
-let idCounter = Date.now();
-function genId() {
-  return `proj-${++idCounter}`;
+function genId(): string {
+  return uuidv4();
 }
 
 const PROJECT_COLORS = [
-  "199 89% 48%",
-  "142 71% 45%",
-  "262 83% 58%",
-  "25 95% 53%",
-  "330 81% 60%",
-  "0 84% 60%",
+  "203 100% 94%", // Pastel Blue (#E3F2FD)
+  "36 100% 94%", // Pastel Orange (#FFF3E0)
+  "350 100% 96%", // Pastel Pink (#FFEBEE)
+  "280 67% 93%", // Pastel Lavender (#F3E5F5)
+  "129 44% 94%", // Pastel Green (#E8F5E9)
+  "340 82% 94%", // Pastel Rose (#FCE4EC)
+  "197 93% 94%", // Pastel Sky (#E1F5FE)
 ];
 
 export function useProjects() {
   const { data: projects, isLoading } = useProjectsQuery();
   const updateProjectsMutation = useUpdateProjectsMutation();
+  const deleteProjectMutation = useDeleteProjectMutation();
 
   const setProjects = useCallback(
     (updater: Project[] | ((prev: Project[]) => Project[])) => {
@@ -53,22 +56,28 @@ export function useProjects() {
   const createProject = useCallback(
     (title: string, description: string = "") => {
       const id = genId();
+      const key = title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
       const now = new Date().toISOString();
       const project: Project = {
         id,
+        key,
         title,
         description,
         color: PROJECT_COLORS[(projects?.length || 0) % PROJECT_COLORS.length],
+        background: {
+          type: "color",
+          value: "0 0% 100%",
+        },
         createdAt: now,
         updatedAt: now,
       };
 
-      // Initialize default board for this project
-      const board: BoardState = { ...DEFAULT_BOARD, title };
+      // Initialize default board for this project in Supabase
+      const board: BoardState = { ...DEFAULT_BOARD, title, projectId: id };
       localStorage.setItem(BOARD_KEY_PREFIX + id, JSON.stringify(board));
 
       setProjects((prev) => [...prev, project]);
-      return id;
+      return key;
     },
     [projects?.length, setProjects],
   );
@@ -76,9 +85,11 @@ export function useProjects() {
   const deleteProject = useCallback(
     (id: string) => {
       localStorage.removeItem(BOARD_KEY_PREFIX + id);
+      // Also delete from Supabase (soft delete with cascade)
+      deleteProjectMutation.mutate(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
     },
-    [setProjects],
+    [setProjects, deleteProjectMutation],
   );
 
   const updateProject = useCallback(
