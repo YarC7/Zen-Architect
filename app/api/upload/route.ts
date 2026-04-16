@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadToR2, generateR2Key, deleteFromR2 } from "@/utils/r2/client";
+import { createClient } from "@supabase/supabase-js";
+import { createQueueManager } from "@/utils/queue";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * POST /api/upload
- * Upload file to Cloudflare R2
+ * Upload file to Cloudflare R2 and enqueue for processing
  * Body: FormData with file and folder
  */
 export async function POST(request: NextRequest) {
@@ -45,11 +48,36 @@ export async function POST(request: NextRequest) {
     // Upload to R2
     const publicUrl = await uploadToR2(file, key);
 
+    // Enqueue image processing job (thumbnail generation, etc)
+    const fileId = uuidv4();
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+    const queueManager = createQueueManager(supabase);
+
+    try {
+      await queueManager.enqueue("image_processing", {
+        type: "image_processing",
+        fileId,
+        bucket: folder,
+        key,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      });
+      console.log(`[Upload] Enqueued image processing for ${file.name}`);
+    } catch (queueError) {
+      // Log queue error but don't fail the upload
+      console.error(`[Upload] Failed to enqueue processing:`, queueError);
+    }
+
     return NextResponse.json({
       success: true,
       url: publicUrl,
       key: key,
       filename: file.name,
+      fileId,
     });
   } catch (error) {
     console.error("Upload error:", error);
