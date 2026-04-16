@@ -6,37 +6,17 @@ This document explains how to use the pgmq queue system integrated into ZenArc.
 
 ### 1. Environment Variables
 
-**For local development** (`.env.local`):
+No additional environment variables needed! Supabase pg_cron runs directly in the database.
+
+**Local development** (`.env.local`) - Already configured from Supabase project:
 
 ```env
-# Queue processor
-QUEUE_PROCESSOR_SECRET=dev-secret-for-testing
-
-# Optional: local cron testing
-CRON_SECRET=dev-cron-secret
-NEXT_PUBLIC_URL=http://localhost:1707
-```
-
-**For production (Vercel dashboard)** → Settings → Environment Variables:
-
-```env
-CRON_SECRET=<generate-with: openssl rand -hex 32>
-QUEUE_PROCESSOR_SECRET=<generate-with: openssl rand -hex 32>
-NEXT_PUBLIC_URL=https://your-app.vercel.app
-
 # These should already be set
 NEXT_PUBLIC_SUPABASE_URL=your_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
-**Generate secure secrets:**
-
-```bash
-openssl rand -hex 32
-# or
-echo $RANDOM | md5sum
-# or online: https://random.org/
-```
+> ✅ Database cron jobs run directly inside Supabase - no external secrets needed!
 
 ### 2. Enable pgmq Extension
 
@@ -52,64 +32,67 @@ Or manually execute the SQL in Supabase SQL editor.
 
 ### 3. Setup Cron Job for Queue Processing
 
-You need to periodically process queue jobs. Options:
-
-#### Option A: Using Vercel Cron (Recommended) ✅ IMPLEMENTED
-
-Files already created:
-
-- ✅ `app/api/cron/process-queue/route.ts`
-- ✅ `vercel.json`
-
-The cron job runs every **5 minutes** (`*/5 * * * *`).
+✅ **Supabase pg_cron** - Runs directly in database, completely free!
 
 **Setup Steps:**
 
-1. **Add environment variables to Vercel:**
-
-   Go to your Vercel project settings → Environment Variables and add:
-
-   ```env
-   CRON_SECRET=your-super-secret-random-key-here
-   QUEUE_PROCESSOR_SECRET=your-super-secret-random-key-here
-   NEXT_PUBLIC_URL=https://your-app.vercel.app
-   ```
-
-   > ⚠️ `CRON_SECRET` must match the header Vercel sends automatically
-   > Use `openssl rand -hex 32` to generate secure secrets
-
-2. **Push to production:**
+1. **Deploy the migration** (creates pgmq + pg_cron functions):
 
    ```bash
-   git add vercel.json app/api/cron/process-queue/route.ts
-   git commit -m "feat: add vercel cron for queue processing"
-   git push
+   npx supabase migration up
    ```
 
-3. **Verify deployment:**
-   - Go to https://your-app.vercel.app/api/cron/process-queue
-   - You should see: `{ status: 'Cron endpoint is active', ... }`
-   - Check Vercel dashboard Crons tab to see scheduled jobs
+2. **Verify in Supabase Dashboard:**
 
-4. **Monitor execution:**
-   - Vercel dashboard → Cron Jobs tab shows all executions
-   - Check logs: Vercel dashboard → Functions Logs
-   - Query database: `SELECT * FROM queue_jobs_log ORDER BY processed_at DESC;`
+   SQL Editor → Run:
 
-#### Option B: Using External Cron Service (EasyCron, node-cron, etc)
+   ```sql
+   -- View all scheduled cron jobs
+   SELECT * FROM cron.job;
 
-Call `/api/queue/process` every 5 minutes:
+   -- Expected output: 3 jobs
+   -- - process-image-queue (every 5 min)
+   -- - process-activity-queue (every 5 min)
+   -- - process-notifications-queue (every 5 min)
+   ```
 
-```bash
-curl -X POST https://your-app.com/api/queue/process \
-  -H "Authorization: Bearer YOUR_QUEUE_PROCESSOR_SECRET"
-```
+3. **Monitor execution history:**
 
-#### Option C: Manual Processing (Development)
+   ```sql
+   SELECT * FROM cron.job_run_details
+   ORDER BY start_time DESC
+   LIMIT 10;
+   ```
 
-```bash
-curl -X POST http://localhost:1707/api/queue/process \
-  -H "Authorization: Bearer your-secret"
+4. **Check queue processing results:**
+
+   ```sql
+   SELECT queue_name, status, COUNT(*) as count
+   FROM queue_jobs_log
+   GROUP BY queue_name, status;
+   ```
+
+**How it works:**
+
+- Database runs cron functions automatically every 5 minutes
+- Functions read from pgmq queues and process jobs
+- Results logged to `queue_jobs_log` table
+- No external service, no secrets, completely managed by Supabase
+- Cost: $0 (included with database)
+
+#### Testing Manually
+
+Run processors without waiting for cron:
+
+```sql
+-- Test image processing queue
+SELECT * FROM public.process_image_processing_queue();
+
+-- Test activity logging queue
+SELECT * FROM public.process_activity_logging_queue();
+
+-- Test notifications queue
+SELECT * FROM public.process_notifications_queue();
 ```
 
 ---
@@ -186,34 +169,46 @@ const response = await fetch("/api/queue/enqueue", {
 
 ---
 
-## 🔧 Implementing Job Handlers
+## 🔧 Implementing Custom Job Handlers
 
-Edit `app/api/queue/process/route.ts` to implement your business logic:
+The pg_cron functions handle queue processing automatically. To add custom logic:
 
-```typescript
-async function handleImageProcessing(job: ImageProcessingJob) {
-  // Your implementation here
-  console.log(`Processing image: ${job.fileName}`);
+Edit `supabase/migrations/20260416_add_pg_cron_function.sql` in the appropriate function:
 
-  // Example: Generate thumbnail
-  // const thumbnail = await generateThumbnail(job.key);
+**Image Processing (thumbnail generation, etc):**
 
-  // Example: Run ML model
-  // const metadata = await extractMetadata(job.key);
-}
-
-async function handleActivityLogging(supabase, job: ActivityLoggingJob) {
-  // Already implemented - writes to activities table
-}
-
-async function handleNotifications(job: NotificationJob) {
-  // Your implementation here
-  console.log(`Sending notification to ${job.userId}`);
-
-  // Example: Send email
-  // await sendEmail(job.userId, job.title, job.message);
-}
+```sql
+-- In process_image_processing_queue function, add your logic:
+BEGIN
+  -- Download from R2
+  -- Generate thumbnail with Sharp or other tool
+  -- Upload back to R2
+  -- Update database with thumbnail URL
+  RAISE NOTICE '[ImageProcessing] Processed %', v_msg->>'fileName';
+END;
 ```
+
+**Activity Logging:**
+
+```sql
+-- Already implemented in process_activity_logging_queue
+-- Automatically inserts to activities table
+-- Extract data from JSONB: v_msg->>'projectId', v_msg->>'action', etc.
+```
+
+**Notifications (email, push, etc):**
+
+```sql
+-- In process_notifications_queue function:
+BEGIN
+  -- Send email: v_msg->>'title', v_msg->>'message'
+  -- Send push notification to v_msg->>'userId'
+  -- Store notification record
+  RAISE NOTICE '[Notifications] Sent to %', v_msg->>'userId';
+END;
+```
+
+> 💡 For complex logic, call HTTP webhooks from SQL using `http` extension, or move to TypeScript handlers
 
 ---
 
@@ -257,47 +252,147 @@ ORDER BY processed_at DESC;
 
 ## ⚙️ Configuration
 
-### Visibility Timeout
+### Visibility Timeout (in pg_cron)
 
-Default: 30-60 seconds. If a job isn't completed in this time, it becomes visible again for retry.
+Default: 60 seconds. If a job isn't completed, it becomes visible again for retry.
 
-Adjust in `app/api/queue/process/route.ts`:
+Adjust in migration function:
 
-```typescript
-const messages = await queueManager.read(queueName, limit, 120); // 120 second timeout
+```sql
+-- Change from current:
+FROM pgmq.read('image_processing', 5, 60)
+-- To longer timeout:
+FROM pgmq.read('image_processing', 5, 120)  -- 120 second timeout
 ```
 
-### Processing Limits
+### Processing Frequency
 
-Default: 10 jobs per queue per cycle.
+Default: Every **5 minutes** (`*/5 * * * *`).
 
-Adjust with query param: `/api/queue/process?limit=20`
+Adjust in migration:
 
-### Queue Size
+```sql
+-- Change cron schedule from:
+SELECT cron.schedule('process-image-queue', '*/5 * * * *', ...);
+-- To every minute:
+SELECT cron.schedule('process-image-queue', '*/1 * * * *', ...);
+-- Or every hour:
+SELECT cron.schedule('process-image-queue', '0 * * * *', ...);
+```
 
-pgmq automatically manages queue cleanup. Completed/failed jobs are logged in `queue_jobs_log` table for audit trail.
+### Queue Processing Limits
+
+Default: 5 jobs per queue per cycle.
+
+Adjust in migration:
+
+```sql
+-- From:
+FROM pgmq.read('image_processing', 5, 60)
+-- To 10 jobs:
+FROM pgmq.read('image_processing', 10, 60)
+```
+
+### Queue Cleanup
+
+pgmq automatically manages queue cleanup. Completed/failed jobs stay in `queue_jobs_log` table for audit trail (never auto-deleted).
 
 ---
 
 ## 🚨 Troubleshooting
 
-### Jobs Not Processing
+### Cron Jobs Not Running
 
-1. Check cron job is running (check Vercel/deployment logs)
-2. Verify `QUEUE_PROCESSOR_SECRET` is set
-3. Check pgmq extension is enabled: `SELECT * FROM pgmq.queue;`
-4. Verify Supabase credentials are correct
+1. Check if pg_cron functions exist:
 
-### Jobs Failing
+   ```sql
+   SELECT * FROM cron.job WHERE jobname LIKE 'process-%';
+   ```
 
-1. Check `queue_jobs_log` table for error messages
-2. Implement better error handling in job handlers
-3. Add retry logic with exponential backoff
+2. Verify functions were created:
+
+   ```sql
+   SELECT routine_name FROM information_schema.routines
+   WHERE routine_name LIKE 'process%queue';
+   ```
+
+3. Check execution history:
+
+   ```sql
+   SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 5;
+   ```
+
+4. Check for errors in last run:
+   ```sql
+   SELECT * FROM cron.job_run_details
+   WHERE status = 'failed'
+   ORDER BY start_time DESC LIMIT 5;
+   ```
+
+### Jobs Not Processing Correctly
+
+1. Check pgmq extension is enabled:
+
+   ```sql
+   SELECT * FROM pgmq.queue;
+   ```
+
+2. Check queue contents:
+
+   ```sql
+   SELECT msg_id, msg, read_ct FROM pgmq.q_image_processing LIMIT 5;
+   ```
+
+3. Check for errors in job_log table:
+
+   ```sql
+   SELECT * FROM queue_jobs_log
+   WHERE status = 'failed'
+   ORDER BY processed_at DESC LIMIT 10;
+   ```
+
+4. Run a function manually to test:
+   ```sql
+   SELECT * FROM public.process_image_processing_queue();
+   -- Returns: (processed_count, failed_count)
+   ```
 
 ### High Queue Backlog
 
-1. Increase processing frequency (every 1 minute instead of 5)
-2. Increase `limit` parameter (process more jobs per cycle)
+1. Increase processing frequency (every 1 minute instead of 5):
+
+   ```sql
+   -- Delete old schedule
+   SELECT cron.unschedule('process-image-queue');
+
+   -- Create new more frequent schedule
+   SELECT cron.schedule(
+     'process-image-queue',
+     '*/1 * * * *',
+     'SELECT public.process_image_processing_queue()'
+   );
+   ```
+
+2. Increase jobs per cycle (from 5 to 20):
+   - Edit migration function
+   - Re-deploy: `npx supabase migration up`
+
+### Test Manually Without Waiting
+
+Run functions immediately:
+
+```sql
+-- Test all processors
+SELECT * FROM public.process_image_processing_queue();
+SELECT * FROM public.process_activity_logging_queue();
+SELECT * FROM public.process_notifications_queue();
+
+-- Check results
+SELECT COUNT(*) as total, status
+FROM queue_jobs_log
+GROUP BY status;
+```
+
 3. Add more worker instances if using distributed workers
 
 ---
