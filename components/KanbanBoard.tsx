@@ -115,7 +115,7 @@ export function KanbanBoard({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex-1 overflow-x-auto">
+      <div className="flex-1">
         <div className="flex gap-4 p-4 h-full items-start">
           {board.columns.map((col: Column, colIndex: number) => {
             const visibleIds = filteredCardIds(col.cardIds);
