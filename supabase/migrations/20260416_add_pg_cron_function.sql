@@ -17,7 +17,7 @@ DECLARE
 BEGIN
   -- Read up to 5 messages with 60s visibility timeout
   FOR v_msg_id, v_read_ct, v_enqueued_at, v_msg IN
-    SELECT msg_id, read_ct, enqueued_at, msg
+    SELECT msg_id, read_ct, enqueued_at, message
     FROM pgmq.read('image_processing', 5, 60)
   LOOP
     BEGIN
@@ -58,7 +58,7 @@ DECLARE
   v_error TEXT;
 BEGIN
   FOR v_msg_id, v_read_ct, v_enqueued_at, v_msg IN
-    SELECT msg_id, read_ct, enqueued_at, msg
+    SELECT msg_id, read_ct, enqueued_at, message
     FROM pgmq.read('activity_logging', 10, 60)
   LOOP
     BEGIN
@@ -115,7 +115,7 @@ DECLARE
   v_error TEXT;
 BEGIN
   FOR v_msg_id, v_read_ct, v_enqueued_at, v_msg IN
-    SELECT msg_id, read_ct, enqueued_at, msg
+    SELECT msg_id, read_ct, enqueued_at, message
     FROM pgmq.read('notifications', 5, 60)
   LOOP
     BEGIN
