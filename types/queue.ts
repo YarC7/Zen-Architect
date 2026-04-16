@@ -18,13 +18,11 @@ export interface ImageProcessingJob {
 }
 
 export interface ActivityLoggingJob {
-  type: "activity_logging";
   projectId: string;
+  cardId?: string | null;
   userId: string | null;
-  action: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, any>;
+  type: "create" | "update" | "delete" | "move" | "comment";
+  description: string;
 }
 
 export interface NotificationJob {

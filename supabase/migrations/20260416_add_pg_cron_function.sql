@@ -3,6 +3,23 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
+-- Create queue_jobs_log table for tracking processed jobs
+CREATE TABLE IF NOT EXISTS public.queue_jobs_log (
+  id BIGSERIAL PRIMARY KEY,
+  queue_name TEXT NOT NULL,
+  msg_id BIGINT NOT NULL,
+  payload JSONB,
+  status TEXT NOT NULL,
+  error TEXT,
+  processed_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_jobs_log_queue_name 
+ON public.queue_jobs_log(queue_name);
+CREATE INDEX IF NOT EXISTS idx_queue_jobs_log_created_at 
+ON public.queue_jobs_log(created_at DESC);
+
 -- Function to process image_processing queue jobs
 CREATE OR REPLACE FUNCTION public.process_image_processing_queue()
 RETURNS TABLE(processed_count INT, failed_count INT) AS $$
@@ -62,22 +79,21 @@ BEGIN
     FROM pgmq.read('activity_logging', 10, 60)
   LOOP
     BEGIN
-      -- Log activity (TypeScript types ensure correct structure)
+      -- Log activity - map payload to activities table schema
+      -- Payload: { projectId, cardId, userId, type, description }
       INSERT INTO activities (
         project_id,
+        card_id,
         user_id,
-        action,
-        entity_type,
-        entity_id,
-        metadata
+        type,
+        description
       )
       VALUES (
-        v_msg->>'projectId',
-        NULLIF(v_msg->>'userId', 'null'),
-        v_msg->>'action',
-        v_msg->>'entityType',
-        v_msg->>'entityId',
-        (v_msg->'metadata')::JSONB
+        (v_msg->>'projectId')::UUID,
+        CASE WHEN v_msg->>'cardId' = 'null' THEN NULL ELSE (v_msg->>'cardId')::UUID END,
+        NULLIF(v_msg->>'userId', 'null')::UUID,
+        v_msg->>'type',
+        v_msg->>'description'
       );
 
       -- Log to audit table

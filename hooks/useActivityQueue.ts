@@ -7,20 +7,17 @@ import { ActivityLoggingJob } from "@/types/queue";
 export function useActivityQueue() {
   const logActivity = async (
     projectId: string,
-    action: string,
-    entityType: string,
-    entityId: string,
-    metadata?: Record<string, any>,
+    type: "create" | "update" | "delete" | "move" | "comment",
+    description: string,
+    cardId?: string | null,
   ) => {
     try {
       const payload: ActivityLoggingJob = {
-        type: "activity_logging",
         projectId,
+        cardId: cardId || null,
         userId: null, // Can be set from auth context if needed
-        action,
-        entityType,
-        entityId,
-        metadata,
+        type,
+        description,
       };
 
       // Fire and forget - don't wait for response
