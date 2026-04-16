@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function Projects() {
-  const { projects, createProject, deleteProject } = useProjects();
+  const { projects, createProject, deleteProject, isLoading } = useProjects();
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -52,6 +52,14 @@ export default function Projects() {
       console.error("Failed to create project:", error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
