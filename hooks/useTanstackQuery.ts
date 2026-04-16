@@ -561,13 +561,16 @@ export function useUpdateBoardMutation(projectKey: string) {
         }
       }
 
-      // 7. Upsert activities (user_id is nullable — works without auth)
+      // 7. Upsert activities
+
+      // 7a. Project-level activities
       for (const activity of board.activities || []) {
         const { error: activityError } = await client
           .from("activities")
           .upsert({
             id: activity.id,
             project_id: pid,
+            card_id: null, // Project-level activities have no card_id
             type: activity.type,
             description: activity.description,
             created_at: activity.createdAt,
@@ -580,6 +583,31 @@ export function useUpdateBoardMutation(projectKey: string) {
             JSON.stringify(activityError, null, 2),
           );
           // Non-critical: don't throw, continue saving board
+        }
+      }
+
+      // 7b. Card-level activities
+      for (const [cardId, card] of Object.entries(board.cards || {})) {
+        for (const activity of card.activities || []) {
+          const { error: cardActivityError } = await client
+            .from("activities")
+            .upsert({
+              id: activity.id,
+              project_id: pid,
+              card_id: cardId, // Card-level activities have card_id set
+              type: activity.type,
+              description: activity.description,
+              created_at: activity.createdAt,
+            });
+
+          if (cardActivityError) {
+            console.error(
+              "Error upserting card activity",
+              activity.id,
+              JSON.stringify(cardActivityError, null, 2),
+            );
+            // Non-critical: don't throw, continue saving board
+          }
         }
       }
 

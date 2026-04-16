@@ -115,6 +115,16 @@ export function useBoardRealtime(projectKey: string) {
             },
             invalidateDebounced,
           )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "activities",
+              filter: `project_id=eq.${projectId}`,
+            },
+            invalidateDebounced,
+          )
           .subscribe();
       });
 

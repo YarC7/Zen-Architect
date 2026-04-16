@@ -20,7 +20,10 @@ const supabase = createClient();
 export async function getProjectBoard(projectKey: string): Promise<BoardState> {
   // Create a timeout promise to prevent hanging queries
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('getProjectBoard timed out after 15 seconds')), 15000);
+    setTimeout(
+      () => reject(new Error("getProjectBoard timed out after 15 seconds")),
+      15000,
+    );
   });
 
   // 1. Fetch project meta by key
@@ -30,14 +33,14 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       .select("*")
       .eq("key", projectKey)
       .single()) as {
-        data: {
-          id: string;
-          title: string;
-          background_type: string;
-          background_value: string;
-        } | null;
-        error: Error | null;
-      };
+      data: {
+        id: string;
+        title: string;
+        background_type: string;
+        background_value: string;
+      } | null;
+      error: Error | null;
+    };
 
     if (projectError) throw projectError;
     if (!project) throw new Error(`Project not found: ${projectKey}`);
@@ -86,17 +89,21 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       .from("activities")
       .select("*")
       .eq("project_id", project.id)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
 
   const timeoutPromise2 = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('getProjectBoard data fetch timed out after 15 seconds')), 15000);
+    setTimeout(
+      () =>
+        reject(
+          new Error("getProjectBoard data fetch timed out after 15 seconds"),
+        ),
+      15000,
+    );
   });
 
-  const [columnsResult, cardsResult, labelsResult, activitiesResult] = await Promise.race([
-    otherDataPromise,
-    timeoutPromise2
-  ]);
+  const [columnsResult, cardsResult, labelsResult, activitiesResult] =
+    await Promise.race([otherDataPromise, timeoutPromise2]);
 
   if (columnsResult.error) throw columnsResult.error;
   if (cardsResult.error) throw cardsResult.error;
@@ -124,12 +131,16 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       dueDate: dbCard.due_date,
       startTime: dbCard.start_time,
       dueTime: dbCard.due_time,
-      labels: Array.isArray(dbCard.card_labels) ? dbCard.card_labels.map((cl: any) => cl.labels) : [],
-      assignees: Array.isArray(dbCard.card_assignees) ? dbCard.card_assignees.map((ca: any) => ({
-        id: ca.profiles.id,
-        name: ca.profiles.username || "Unknown",
-        color: ca.profiles.color || "199 89% 48%",
-      })) : [],
+      labels: Array.isArray(dbCard.card_labels)
+        ? dbCard.card_labels.map((cl: any) => cl.labels)
+        : [],
+      assignees: Array.isArray(dbCard.card_assignees)
+        ? dbCard.card_assignees.map((ca: any) => ({
+            id: ca.profiles.id,
+            name: ca.profiles.username || "Unknown",
+            color: ca.profiles.color || "199 89% 48%",
+          }))
+        : [],
       checklist: Array.isArray(dbCard.checklist_items)
         ? dbCard.checklist_items
             .filter((ci: any) => !ci.deleted_at)
@@ -150,6 +161,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
               createdAt: cc.created_at,
             }))
         : [],
+      activities: [], // Will be populated below
       createdAt: dbCard.created_at,
       updatedAt: dbCard.updated_at,
     };
@@ -158,6 +170,39 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       archivedCards[dbCard.id] = formattedCard;
     } else {
       cardsLookup[dbCard.id] = formattedCard;
+    }
+  });
+
+  // Map card-level activities from the activities table
+  const formattedActivities =
+    (activities || [])?.map((act: any) => ({
+      id: act.id,
+      type: act.type as any,
+      user: "User", // In a real app, join with profile
+      description: act.description,
+      createdAt: act.created_at,
+      cardId: act.card_id, // Include card_id to map to cards
+    })) || [];
+
+  // Assign card-level activities to their respective cards
+  formattedActivities.forEach((activity: any) => {
+    if (activity.cardId && cardsLookup[activity.cardId]) {
+      cardsLookup[activity.cardId].activities?.push({
+        id: activity.id,
+        type: activity.type,
+        user: activity.user,
+        description: activity.description,
+        createdAt: activity.createdAt,
+      });
+    }
+    if (activity.cardId && archivedCards[activity.cardId]) {
+      archivedCards[activity.cardId].activities?.push({
+        id: activity.id,
+        type: activity.type,
+        user: activity.user,
+        description: activity.description,
+        createdAt: activity.createdAt,
+      });
     }
   });
 
@@ -174,6 +219,11 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       : [],
   }));
 
+  // Filter out card-level activities for project-level activities
+  const projectActivities = formattedActivities.filter(
+    (act: any) => !act.cardId,
+  );
+
   return {
     projectId: project.id,
     title: (project as any).title,
@@ -185,14 +235,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
     cards: cardsLookup,
     labels: labels || [],
     archivedCards,
-    activities:
-      (activities || [])?.map((act: any) => ({
-        id: act.id,
-        type: act.type as any,
-        user: "User", // In a real app, join with profile
-        description: act.description,
-        createdAt: act.created_at,
-      })) || [],
+    activities: projectActivities,
   };
 }
 

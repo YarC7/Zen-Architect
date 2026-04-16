@@ -1,12 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useRef } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +19,8 @@ import {
   RotateCcw,
   Trash2,
   Sunset,
+  Loader2,
+  ImageIcon,
 } from "lucide-react";
 import {
   Label,
@@ -32,6 +28,9 @@ import {
   Activity as ActivityType,
   Card,
 } from "@/types/board";
+import { useFileUpload } from "@/hooks/useFileUpload";
+import { useGallery } from "@/hooks/useGallery";
+import { useBucketStats } from "@/hooks/useBucketStats";
 
 // More vibrant gradients matching Trello style
 const GRADIENT_PRESETS = [
@@ -140,6 +139,29 @@ export function BoardSettings({
     background.type,
   );
   const [imageUrl, setImageUrl] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { upload, isUploading } = useFileUpload();
+  const { stats: bucketStats } = useBucketStats();
+  const {
+    images: galleryImages,
+    loading: galleryLoading,
+    deleteImage,
+  } = useGallery("backgrounds/");
+
+  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const url = await upload(file, "backgrounds");
+      setImageUrl(url);
+      onBackgroundChange({ type: "image", value: url });
+    } catch (error) {
+      console.error("Upload failed:", error);
+    }
+  };
 
   // Edit label state
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
@@ -171,380 +193,592 @@ export function BoardSettings({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="min-w-xl min-h-[65vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <>
+      {/* Overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+          onClick={() => onOpenChange(false)}
+        />
+      )}
+
+      {/* Right Side Panel */}
+      <div
+        className={`fixed right-0 top-0 h-screen w-[400px] sm:w-[500px] bg-white shadow-lg z-50 transform transition-transform duration-300 ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Board Settings
-          </DialogTitle>
-        </DialogHeader>
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onOpenChange(false)}
+            className="h-8 w-8"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
 
-        <Tabs defaultValue="background" className="w-full">
-          <TabsList className="w-full justify-start">
-            <TabsTrigger value="background" className="gap-1.5">
-              <Palette className="h-4 w-4" /> Background
-            </TabsTrigger>
-            <TabsTrigger value="labels" className="gap-1.5">
-              <Tag className="h-4 w-4" /> Labels
-            </TabsTrigger>
-            <TabsTrigger value="archived" className="gap-1.5">
-              <Archive className="h-4 w-4" /> Archived (
-              {Object.keys(archivedCards).length})
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-1.5">
-              <Activity className="h-4 w-4" /> Activity
-            </TabsTrigger>
-          </TabsList>
+        {/* Content */}
+        <div className="h-[calc(100vh-60px)] overflow-y-auto p-4">
+          <Tabs defaultValue="background" className="w-full">
+            <TabsList className="w-full grid grid-cols-2 sm:grid-cols-5 gap-1 h-auto bg-transparent border-b">
+              <TabsTrigger
+                value="background"
+                className="gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white"
+              >
+                <Palette className="h-4 w-4" />
+                <span className="hidden sm:inline">BG</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="gallery"
+                className="gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white"
+              >
+                <ImageIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">IMG</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="labels"
+                className="gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white"
+              >
+                <Tag className="h-4 w-4" />
+                <span className="hidden sm:inline">LBL</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="archived"
+                className="gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white"
+              >
+                <Archive className="h-4 w-4" />
+                <span className="hidden sm:inline">ARC</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="activity"
+                className="gap-1.5 text-xs sm:text-sm data-[state=active]:bg-white"
+              >
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">ACT</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Background Tab */}
-          <TabsContent value="background" className="space-y-4 min-h-[350px]">
-            <div className="flex gap-2 mb-4">
-              <Button
-                variant={bgType === "color" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setBgType("color");
-                  onBackgroundChange({
-                    type: "color",
-                    value: COLOR_PRESETS[0],
-                  });
-                }}
-              >
-                Color
-              </Button>
-              <Button
-                variant={bgType === "gradient" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setBgType("gradient");
-                  // onBackgroundChange({
-                  //   type: "gradient",
-                  //   value: GRADIENT_PRESETS[0],
-                  // });
-                }}
-              >
-                <Sparkles className="h-4 w-4 mr-1" /> Gradient
-              </Button>
-              <Button
-                variant={bgType === "image" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setBgType("image")}
-              >
-                <Image className="h-4 w-4 mr-1" /> Image
-              </Button>
-            </div>
-
-            {bgType === "color" && (
-              <div>
-                <p className="text-sm font-medium mb-2">Pick a color</p>
-                <div className="grid grid-cols-8 gap-2">
-                  {COLOR_PRESETS.map((color) => (
-                    <button
-                      key={color}
-                      className="w-10 h-10 rounded-lg border-2 hover:scale-110 transition-transform"
-                      style={{
-                        backgroundColor: color,
-                        borderColor:
-                          background.value === color ? "#000" : "transparent",
-                      }}
-                      onClick={() =>
-                        onBackgroundChange({ type: "color", value: color })
-                      }
-                    />
-                  ))}
-                </div>
+            {/* Background Tab */}
+            <TabsContent value="background" className="space-y-4">
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={bgType === "color" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setBgType("color");
+                    onBackgroundChange({
+                      type: "color",
+                      value: COLOR_PRESETS[0],
+                    });
+                  }}
+                >
+                  Color
+                </Button>
+                <Button
+                  variant={bgType === "gradient" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setBgType("gradient");
+                  }}
+                >
+                  <Sparkles className="h-4 w-4 mr-1" /> Gradient
+                </Button>
+                <Button
+                  variant={bgType === "image" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setBgType("image")}
+                >
+                  <Image className="h-4 w-4 mr-1" /> Image
+                </Button>
               </div>
-            )}
 
-            {bgType === "gradient" && (
-              <div>
-                <p className="text-sm font-medium mb-2">Pick a gradient</p>
-                <div className="grid grid-cols-4 gap-2 overflow-y-auto overflow-x-hidden max-h-74">
-                  {GRADIENT_PRESETS.map((gradient, i) => (
-                    <button
-                      key={i}
-                      className="w-full h-16 rounded-lg border-2 hover:scale-105 transition-transform"
-                      style={{
-                        background: gradient,
-                        borderColor:
-                          background.value === gradient
-                            ? "#000"
-                            : "transparent",
-                      }}
-                      onClick={() =>
-                        onBackgroundChange({
-                          type: "gradient",
-                          value: gradient,
-                        })
-                      }
-                    />
-                  ))}
+              {bgType === "color" && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Pick a color</p>
+                  <div className="grid grid-cols-6 gap-2">
+                    {COLOR_PRESETS.map((color) => (
+                      <button
+                        key={color}
+                        className="w-10 h-10 rounded-lg border-2 hover:scale-110 transition-transform"
+                        style={{
+                          backgroundColor: color,
+                          borderColor:
+                            background.value === color ? "#000" : "transparent",
+                        }}
+                        onClick={() =>
+                          onBackgroundChange({ type: "color", value: color })
+                        }
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {bgType === "image" && (
+              {bgType === "gradient" && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Pick a gradient</p>
+                  <div className="grid grid-cols-4 gap-2 overflow-y-auto overflow-x-hidden min-h-0">
+                    {GRADIENT_PRESETS.map((gradient, i) => (
+                      <button
+                        key={i}
+                        className="w-full h-16 rounded-lg border-2 hover:scale-105 transition-transform"
+                        style={{
+                          background: gradient,
+                          borderColor:
+                            background.value === gradient
+                              ? "#000"
+                              : "transparent",
+                        }}
+                        onClick={() =>
+                          onBackgroundChange({
+                            type: "gradient",
+                            value: gradient,
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {bgType === "image" && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium mb-2">
+                    Upload or paste image URL
+                  </p>
+
+                  {/* File Upload Button */}
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="w-full"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload from Computer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Or Paste URL */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-muted"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-dialog px-2 text-muted-foreground">
+                        Or
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://example.com/image.jpg"
+                      value={imageUrl || background.value}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          onBackgroundChange({
+                            type: "image",
+                            value: imageUrl,
+                          });
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={() =>
+                        onBackgroundChange({ type: "image", value: imageUrl })
+                      }
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {imageUrl && (
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Preview:
+                      </p>
+                      <img
+                        src={imageUrl}
+                        alt="Background preview"
+                        className="w-full h-32 object-cover rounded-lg"
+                        onError={() => setImageUrl("")}
+                      />
+                    </div>
+                  )}
+
+                  {/* File Size & Storage Info */}
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      📦 Storage Information
+                    </div>
+
+                    {/* Max File Size */}
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">
+                        Max file size:
+                      </span>
+                      <span className="ml-2 font-medium">100 MB</span>
+                    </div>
+
+                    {/* Bucket Storage */}
+                    {bucketStats ? (
+                      <div className="space-y-1">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">
+                            Storage used:
+                          </span>
+                          <span className="ml-2 font-medium">
+                            {bucketStats.usedGB} GB / {bucketStats.maxGB} GB
+                          </span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">
+                            Remaining:
+                          </span>
+                          <span className="ml-2 font-medium text-green-600">
+                            {bucketStats.remainingGB} GB
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-muted rounded-full h-2 mt-1.5">
+                          <div
+                            className="bg-blue-500 h-2 rounded-full transition-all"
+                            style={{
+                              width: `${bucketStats.percentUsed}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="text-xs text-muted-foreground text-right">
+                          {bucketStats.percentUsed}% used
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Loading storage info...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Gallery Tab */}
+            <TabsContent value="gallery" className="space-y-3">
               <div className="space-y-3">
-                <p className="text-sm font-medium mb-2">Enter image URL</p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="https://example.com/image.jpg"
-                    value={imageUrl || background.value}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        onBackgroundChange({ type: "image", value: imageUrl });
-                      }
-                    }}
-                  />
-                  <Button
-                    onClick={() =>
-                      onBackgroundChange({ type: "image", value: imageUrl })
-                    }
-                  >
-                    Apply
-                  </Button>
+                <p className="text-sm font-medium">📸 Uploaded Images</p>
+
+                {galleryLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : galleryImages.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No images uploaded yet</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="min-h-0 w-full ">
+                    <div className="grid grid-cols-2 gap-3">
+                      {galleryImages.map((img) => (
+                        <div
+                          key={img.key}
+                          className="group relative rounded-lg overflow-hidden border hover:border-blue-500 transition-colors"
+                        >
+                          <img
+                            src={img.url}
+                            alt={img.filename}
+                            className="w-full h-24 object-cover cursor-pointer hover:opacity-75 transition-opacity"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => {
+                                setImageUrl(img.url);
+                                setBgType("image");
+                                onBackgroundChange({
+                                  type: "image",
+                                  value: img.url,
+                                });
+                              }}
+                              className="h-8 px-2 text-xs bg-blue-500 hover:bg-blue-600"
+                            >
+                              <Palette className="h-3 w-3 mr-1" />
+                              Set
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => deleteImage(img.key)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="text-xs text-muted-foreground p-1.5 bg-muted/50">
+                            {(img.size / (1024 * 1024)).toFixed(2)} MB
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Labels Tab */}
+            <TabsContent value="labels" className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="New label name"
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
+                />
+                <Input
+                  type="color"
+                  className="w-12 h-10 p-1"
+                  value={
+                    `hsl(${newLabelColor})`.startsWith("hsl(")
+                      ? "#" +
+                        newLabelColor
+                          .split(" ")[0]
+                          .replace("0", "")
+                          .replace("255", "ff")
+                      : "#f97316"
+                  }
+                  onChange={(e) => {
+                    const hex = e.target.value;
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    const h =
+                      (r / 255) * 100 * 0.3 +
+                      (g / 255) * 100 * 0.59 +
+                      (b / 255) * 100 * 0.11;
+                    setNewLabelColor(`${Math.round(h)} 84% 60%`);
+                  }}
+                />
+                <Button onClick={handleAddLabel}>Add</Button>
+              </div>
+
+              <ScrollArea className="min-h-0">
+                <div className="space-y-2">
+                  {labels.map((label) =>
+                    editingLabelId === label.id ? (
+                      // Inline edit mode
+                      <div
+                        key={label.id}
+                        className="flex items-center gap-2 p-2 rounded-lg border border-primary bg-muted"
+                      >
+                        <Input
+                          className="h-8 flex-1"
+                          value={editLabelName}
+                          onChange={(e) => setEditLabelName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEditLabel();
+                            if (e.key === "Escape") cancelEditLabel();
+                          }}
+                          autoFocus
+                        />
+                        <Input
+                          type="color"
+                          className="w-10 h-8 p-0.5 cursor-pointer"
+                          value={`#${parseInt(editLabelColor.split(" ")[0]).toString(16).padStart(2, "0")}8080`}
+                          onChange={(e) => {
+                            const hex = e.target.value;
+                            const r = parseInt(hex.slice(1, 3), 16);
+                            const g = parseInt(hex.slice(3, 5), 16);
+                            const b = parseInt(hex.slice(5, 7), 16);
+                            const h = Math.round(
+                              (r / 255) * 100 * 0.3 +
+                                (g / 255) * 100 * 0.59 +
+                                (b / 255) * 100 * 0.11,
+                            );
+                            setEditLabelColor(`${h} 84% 60%`);
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          className="h-8"
+                          onClick={saveEditLabel}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8"
+                          onClick={cancelEditLabel}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      // Display mode
+                      <div
+                        key={label.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-muted"
+                      >
+                        <Badge
+                          style={{
+                            backgroundColor: `hsl(${label.color} / 0.2)`,
+                            color: `hsl(${label.color})`,
+                          }}
+                        >
+                          {label.name}
+                        </Badge>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => startEditLabel(label)}
+                          >
+                            <span className="text-xs">✏️</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onDeleteLabel(label.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ),
+                  )}
                 </div>
-                {imageUrl && (
-                  <div className="mt-2">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Preview:
-                    </p>
-                    <img
-                      src={imageUrl}
-                      alt="Background preview"
-                      className="w-full h-32 object-cover rounded-lg"
-                      onError={() => setImageUrl("")}
-                    />
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Archived Tab */}
+            <TabsContent value="archived" className="space-y-3">
+              <ScrollArea>
+                {Object.keys(archivedCards).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No archived cards
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.values(archivedCards).map((card) => (
+                      <div
+                        key={card.id}
+                        className="flex items-center justify-between p-3 rounded-lg border"
+                      >
+                        <div>
+                          <p className="font-medium">{card.title}</p>
+                          {card.labels.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {card.labels.map((l) => (
+                                <Badge
+                                  key={l.id}
+                                  style={{
+                                    backgroundColor: `hsl(${l.color} / 0.2)`,
+                                    color: `hsl(${l.color})`,
+                                  }}
+                                  className="text-xs"
+                                >
+                                  {l.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onRestoreCard(card.id)}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" /> Restore
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onDeleteArchivedCard(card.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
-            )}
-          </TabsContent>
+              </ScrollArea>
+            </TabsContent>
 
-          {/* Labels Tab */}
-          <TabsContent value="labels" className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="New label name"
-                value={newLabelName}
-                onChange={(e) => setNewLabelName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAddLabel()}
-              />
-              <Input
-                type="color"
-                className="w-12 h-10 p-1"
-                value={
-                  `hsl(${newLabelColor})`.startsWith("hsl(")
-                    ? "#" +
-                      newLabelColor
-                        .split(" ")[0]
-                        .replace("0", "")
-                        .replace("255", "ff")
-                    : "#f97316"
-                }
-                onChange={(e) => {
-                  const hex = e.target.value;
-                  const r = parseInt(hex.slice(1, 3), 16);
-                  const g = parseInt(hex.slice(3, 5), 16);
-                  const b = parseInt(hex.slice(5, 7), 16);
-                  const h =
-                    (r / 255) * 100 * 0.3 +
-                    (g / 255) * 100 * 0.59 +
-                    (b / 255) * 100 * 0.11;
-                  setNewLabelColor(`${Math.round(h)} 84% 60%`);
-                }}
-              />
-              <Button onClick={handleAddLabel}>Add</Button>
-            </div>
-
-            <ScrollArea className="h-[300px]">
-              <div className="space-y-2">
-                {labels.map((label) =>
-                  editingLabelId === label.id ? (
-                    // Inline edit mode
-                    <div
-                      key={label.id}
-                      className="flex items-center gap-2 p-2 rounded-lg border border-primary bg-muted"
-                    >
-                      <Input
-                        className="h-8 flex-1"
-                        value={editLabelName}
-                        onChange={(e) => setEditLabelName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveEditLabel();
-                          if (e.key === "Escape") cancelEditLabel();
-                        }}
-                        autoFocus
-                      />
-                      <Input
-                        type="color"
-                        className="w-10 h-8 p-0.5 cursor-pointer"
-                        value={`#${parseInt(editLabelColor.split(" ")[0]).toString(16).padStart(2, "0")}8080`}
-                        onChange={(e) => {
-                          const hex = e.target.value;
-                          const r = parseInt(hex.slice(1, 3), 16);
-                          const g = parseInt(hex.slice(3, 5), 16);
-                          const b = parseInt(hex.slice(5, 7), 16);
-                          const h = Math.round(
-                            (r / 255) * 100 * 0.3 +
-                              (g / 255) * 100 * 0.59 +
-                              (b / 255) * 100 * 0.11,
-                          );
-                          setEditLabelColor(`${h} 84% 60%`);
-                        }}
-                      />
-                      <Button size="sm" className="h-8" onClick={saveEditLabel}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8"
-                        onClick={cancelEditLabel}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    // Display mode
-                    <div
-                      key={label.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-muted"
-                    >
-                      <Badge
-                        style={{
-                          backgroundColor: `hsl(${label.color} / 0.2)`,
-                          color: `hsl(${label.color})`,
-                        }}
-                      >
-                        {label.name}
-                      </Badge>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => startEditLabel(label)}
-                        >
-                          <span className="text-xs">✏️</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onDeleteLabel(label.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+            {/* Activity Tab */}
+            <TabsContent value="activity">
+              <ScrollArea className="min-h-0">
+                {activities.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No activity yet
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {[...activities].reverse().map((activity) => (
+                      <div key={activity.id} className="flex gap-3 text-sm">
+                        <div className="mt-1">
+                          {activity.type === "create" && (
+                            <span className="text-green-500">+</span>
+                          )}
+                          {activity.type === "update" && (
+                            <span className="text-blue-500">~</span>
+                          )}
+                          {activity.type === "delete" && (
+                            <span className="text-red-500">-</span>
+                          )}
+                          {activity.type === "move" && (
+                            <span className="text-orange-500">&rarr;</span>
+                          )}
+                          {activity.type === "comment" && (
+                            <span className="text-purple-500">#</span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p>{activity.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.user} &middot;{" "}
+                            {new Date(activity.createdAt).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ),
+                    ))}
+                  </div>
                 )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          {/* Archived Tab */}
-          <TabsContent value="archived">
-            <ScrollArea className="h-[350px]">
-              {Object.keys(archivedCards).length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  No archived cards
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {Object.values(archivedCards).map((card) => (
-                    <div
-                      key={card.id}
-                      className="flex items-center justify-between p-3 rounded-lg border"
-                    >
-                      <div>
-                        <p className="font-medium">{card.title}</p>
-                        {card.labels.length > 0 && (
-                          <div className="flex gap-1 mt-1">
-                            {card.labels.map((l) => (
-                              <Badge
-                                key={l.id}
-                                style={{
-                                  backgroundColor: `hsl(${l.color} / 0.2)`,
-                                  color: `hsl(${l.color})`,
-                                }}
-                                className="text-xs"
-                              >
-                                {l.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onRestoreCard(card.id)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-1" /> Restore
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onDeleteArchivedCard(card.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity">
-            <ScrollArea className="h-[350px]">
-              {activities.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  No activity yet
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {[...activities].reverse().map((activity) => (
-                    <div key={activity.id} className="flex gap-3 text-sm">
-                      <div className="mt-1">
-                        {activity.type === "create" && (
-                          <span className="text-green-500">+</span>
-                        )}
-                        {activity.type === "update" && (
-                          <span className="text-blue-500">~</span>
-                        )}
-                        {activity.type === "delete" && (
-                          <span className="text-red-500">-</span>
-                        )}
-                        {activity.type === "move" && (
-                          <span className="text-orange-500">&rarr;</span>
-                        )}
-                        {activity.type === "comment" && (
-                          <span className="text-purple-500">#</span>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <p>{activity.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.user} &middot;{" "}
-                          {new Date(activity.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </>
   );
 }

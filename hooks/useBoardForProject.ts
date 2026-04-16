@@ -285,7 +285,9 @@ export function useBoardForProject(projectKey: string) {
         if (!oldCard) return prev;
 
         const newActivities = [...(prev.activities || [])];
-        const newCardActivities = [...(card.activities || [])];
+        const newCardActivities = [
+          ...(card.activities ?? oldCard.activities ?? []),
+        ];
 
         // 1. Check for new comment
         const isNewComment =
@@ -300,8 +302,7 @@ export function useBoardForProject(projectKey: string) {
             createdAt: new Date().toISOString(),
           };
           newActivities.unshift(activity);
-          // Note: CardDetailDialog already manually adds to card.activities for comments,
-          // we are just syncing to global project activities here.
+          newCardActivities.unshift(activity); // Also add to card-level activities so it shows in card detail
         }
 
         // 2. Check for completion toggle

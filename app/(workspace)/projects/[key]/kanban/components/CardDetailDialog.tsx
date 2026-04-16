@@ -133,8 +133,8 @@ function DatePopover({
   const saveDates = () => {
     const normalizedDueDate =
       hasDueDate &&
-        selectedDate &&
-        (!selectedStartDate || selectedDate >= selectedStartDate)
+      selectedDate &&
+      (!selectedStartDate || selectedDate >= selectedStartDate)
         ? selectedDate
         : null;
 
@@ -581,11 +581,11 @@ export function CardDetailDialog({
 }: CardDetailDialogProps) {
   const [newComment, setNewComment] = useState("");
   const [newCheckItem, setNewCheckItem] = useState("");
-  const [showActivity, setShowActivity] = useState(false);
   const [localTitle, setLocalTitle] = useState(card?.title || "");
   const [labelsOpen, setLabelsOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const checklistRef = useRef<HTMLDivElement>(null);
   const checklistInputRef = useRef<HTMLInputElement>(null);
@@ -680,24 +680,28 @@ export function CardDetailDialog({
       createdAt: new Date().toISOString(),
     };
 
-    const activity: Activity = {
-      id: uuidv4(),
+    const activityId = uuidv4();
+    const activity: Omit<Activity, "id" | "createdAt"> = {
       type: "comment",
       user: "User",
-      description: `đã bình luận: "${newComment.trim().slice(0, 30)}${newComment.trim().length > 30 ? "..." : ""}"`,
-      createdAt: new Date().toISOString(),
+      description: newComment.trim(),
     };
 
     const updatedCard = {
       ...card,
       comments: [...(card.comments || []), comment],
-      activities: [activity, ...(card.activities || [])],
+      activities: [
+        ...(card.activities || []),
+        { ...activity, id: activityId, createdAt: new Date().toISOString() },
+      ],
     };
 
     onUpdate(updatedCard);
+    if (onAddActivity) {
+      onAddActivity(activity);
+    }
     setNewComment("");
   };
-
 
   const feedItems = [
     ...(card.comments || []).map((c) => ({
@@ -1180,7 +1184,7 @@ export function CardDetailDialog({
                           className={cn(
                             "text-sm flex-1 break-words transition-all duration-300",
                             item.checked &&
-                            "line-through text-muted-foreground opacity-60",
+                              "line-through text-muted-foreground opacity-60",
                           )}
                         >
                           {item.text}
@@ -1242,14 +1246,16 @@ export function CardDetailDialog({
                     Hoạt động
                   </h3>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-[10px] font-bold px-2 border-muted/50 text-muted-foreground hover:bg-muted"
-                  onClick={() => setShowActivity(!showActivity)}
-                >
-                  {showActivity ? "Ẩn chi tiết" : "Hiện chi tiết"}
-                </Button>
+                {(card?.activities || []).length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowActivity(!showActivity)}
+                  >
+                    {showActivity ? "Ẩn chi tiết" : "Hiện chi tiết"}
+                  </Button>
+                )}
               </div>
 
               <div className="flex-1 flex flex-col gap-6 min-h-0">
@@ -1282,10 +1288,56 @@ export function CardDetailDialog({
                 {/* Combined Feed List */}
                 <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                   {feedItems.map((item) => {
-                    if (item.feedType === "activity" && !showActivity)
-                      return null;
+                    // Check if this is an activity or comment
+                    if (item.feedType === "activity" && !showActivity) {
+                      return null; // Hide activity if showActivity is false
+                    }
 
-                    if (item.feedType === "comment") {
+                    if (item.feedType === "activity") {
+                      const activity = item as Activity;
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
+                        >
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/50">
+                            {activity.type === "comment" && (
+                              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                            {activity.type === "move" && (
+                              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                            {activity.type === "update" && (
+                              <History className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                            {activity.type === "create" && (
+                              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                            {activity.type === "delete" && (
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-foreground">
+                                {activity.user}
+                              </span>
+                              <span className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatDistanceToNow(
+                                  new Date(activity.createdAt),
+                                  { addSuffix: true },
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {activity.description}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      // Comment item
                       const comment = item as Comment;
                       return (
                         <div
@@ -1313,47 +1365,6 @@ export function CardDetailDialog({
                             <div className="bg-muted/30 border rounded-2xl rounded-tl-none px-2 py-2 text-sm shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
                               {comment.text}
                             </div>
-                          </div>
-                        </div>
-                      );
-                    } else {
-                      const activity = item as Activity;
-                      return (
-                        <div
-                          key={item.id}
-                          className="relative pl-11 animate-in fade-in slide-in-from-left-2 duration-300"
-                        >
-                          <div className="absolute left-[15px] top-1/2 -translate-y-1/2 w-[1px] h-full bg-muted/60" />
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full border bg-background flex items-center justify-center z-10 shadow-sm border-muted/30">
-                            {activity.type === "create" && (
-                              <Plus className="h-3.5 w-3.5 text-green-500" />
-                            )}
-                            {activity.type === "move" && (
-                              <History className="h-3.5 w-3.5 text-blue-500" />
-                            )}
-                            {activity.type === "update" && (
-                              <User className="h-3.5 w-3.5 text-orange-500" />
-                            )}
-                            {activity.type === "comment" && (
-                              <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                            )}
-                          </div>
-                          <div className="space-y-0.5">
-                            <p className="text-[12px] leading-relaxed">
-                              <span className="font-bold text-foreground">
-                                {activity.user}
-                              </span>{" "}
-                              <span className="text-muted-foreground">
-                                {activity.description}
-                              </span>
-                            </p>
-                            <span className="text-[9px] text-muted-foreground/60 font-medium flex items-center gap-1">
-                              <Clock className="h-2.5 w-2.5" />
-                              {formatDistanceToNow(
-                                new Date(activity.createdAt),
-                                { addSuffix: true },
-                              )}
-                            </span>
                           </div>
                         </div>
                       );

@@ -46,7 +46,7 @@ export function AddColumnInline({ onAddColumn }: AddColumnInlineProps) {
   return (
     <button
       onClick={() => setAdding(true)}
-      className="w-72 min-w-[288px] rounded-xl bg-muted/30 hover:bg-muted/50 border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40 p-3 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+      className="w-72 min-w-[288px] rounded-xl bg-muted/30 hover:bg-muted/50 border border-dashed border-muted-foreground/20 hover:border-muted-foreground/40 p-3 flex items-center gap-2 text-sm text-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
     >
       <Plus className="h-4 w-4" />
       Add another list
