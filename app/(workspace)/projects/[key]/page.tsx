@@ -34,6 +34,8 @@ export default function ProjectDetail() {
   const {
     board,
     isLoading,
+    isError,
+    error,
     setBoard,
     setColumnColor,
     copyColumn,
@@ -56,6 +58,8 @@ export default function ProjectDetail() {
     addActivity,
   } = useBoardForProject(id || "");
 
+  // `isError` and `error` are now returned from the hook above.
+
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [filterLabel, setFilterLabel] = useState<string | null>(null);
@@ -76,7 +80,12 @@ export default function ProjectDetail() {
 
   const allAssignees = useMemo(() => {
     if (!board) return [];
-    return getAllAssignees(board.cards);
+    try {
+      return getAllAssignees(board.cards);
+    } catch (error) {
+      console.error("Error getting assignees:", error);
+      return [];
+    }
   }, [board]);
 
   const openCard = useCallback((card: Card) => {
@@ -87,39 +96,89 @@ export default function ProjectDetail() {
   const filteredCardIds = useCallback(
     (cardIds: string[]) => {
       if (!board) return [];
-      return filterCards(board.cards, cardIds, { filterLabel, filterAssignee });
+      try {
+        return filterCards(board.cards, cardIds, {
+          filterLabel,
+          filterAssignee,
+        });
+      } catch (error) {
+        console.error("Error filtering cards:", error);
+        return [];
+      }
     },
     [board, filterLabel, filterAssignee],
   );
 
-  const liveSelectedCard =
-    selectedCard && board ? board.cards[selectedCard.id] || null : null;
+  const liveSelectedCard = useMemo(() => {
+    if (!selectedCard || !board) return null;
+    try {
+      return board.cards[selectedCard.id] || null;
+    } catch (error) {
+      console.error("Error getting live selected card:", error);
+      return null;
+    }
+  }, [selectedCard, board]);
 
-  const archivedCount = board?.archivedCards
-    ? Object.keys(board.archivedCards).length
-    : 0;
+  const archivedCount = useMemo(() => {
+    if (!board?.archivedCards) return 0;
+    try {
+      return Object.keys(board.archivedCards).length;
+    } catch (error) {
+      console.error("Error getting archived count:", error);
+      return 0;
+    }
+  }, [board]);
 
   // Get background style
   const backgroundStyle = useMemo(() => {
-    return getBackgroundStyle(board);
+    try {
+      return getBackgroundStyle(board);
+    } catch (error) {
+      console.error("Error getting background style:", error);
+      return {};
+    }
   }, [board]);
 
   const allCards = useMemo(() => {
     if (!board) return [];
     const cards: Card[] = [];
-    board.columns.forEach((col) => {
-      filteredCardIds(col.cardIds).forEach((id) => {
-        const card = board.cards[id];
-        if (card) cards.push(card);
+    try {
+      board.columns.forEach((col) => {
+        filteredCardIds(col.cardIds).forEach((id) => {
+          const card = board.cards[id];
+          if (card) cards.push(card);
+        });
       });
-    });
+    } catch (error) {
+      console.error("Error processing allCards:", error);
+      return [];
+    }
     return cards;
   }, [board, filteredCardIds]);
 
-  if (isLoading || !board) {
+  if (isLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!isLoading && (isError || !board)) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center p-6">
+        <h2 className="text-2xl font-semibold mb-2">Không thể tải dự án</h2>
+        <p className="text-sm text-muted-foreground mb-4 text-center">
+          {isError
+            ? "Có lỗi xảy ra khi tải dữ liệu từ server. Vui lòng kiểm tra cấu hình Supabase hoặc thử lại."
+            : "Dự án không tồn tại hoặc không có dữ liệu."}
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => router.refresh()}>Thử lại</Button>
+          <Button variant="ghost" onClick={() => router.push("/")}>
+            Quay về danh sách dự án
+          </Button>
+        </div>
       </div>
     );
   }
@@ -207,6 +266,7 @@ export default function ProjectDetail() {
       </div>
 
       {activeView === "kanban" && (
+        <div className="flex-1 overflow-auto">
           <KanbanBoard
             board={board}
             filteredCardIds={filteredCardIds}
@@ -222,6 +282,7 @@ export default function ProjectDetail() {
             archiveAllCards={archiveAllCards}
             addColumn={addColumn}
           />
+        </div>
       )}
 
       {activeView === "list" && (
@@ -232,8 +293,12 @@ export default function ProjectDetail() {
             filteredCardIds={filteredCardIds}
             onCardClick={openCard}
             onToggleComplete={(cardId) => {
-              const c = board.cards[cardId];
-              if (c) updateCard({ ...c, completed: !c.completed });
+              try {
+                const c = board.cards[cardId];
+                if (c) updateCard({ ...c, completed: !c.completed });
+              } catch (error) {
+                console.error("Error toggling card completion:", error);
+              }
             }}
             onUpdateCard={updateCard}
           />

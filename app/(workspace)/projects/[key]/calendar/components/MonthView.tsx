@@ -160,7 +160,13 @@ function WeekRow({
     const spanning: Card[] = [];
     const singleDay: Card[] = [];
 
-    cards.forEach((card) => {
+    // Limit the number of cards processed to prevent performance issues
+    const MAX_CARDS_TO_PROCESS = 500;
+    const cardsToProcess = cards.length > MAX_CARDS_TO_PROCESS
+      ? cards.slice(0, MAX_CARDS_TO_PROCESS)
+      : cards;
+
+    cardsToProcess.forEach((card) => {
       if (!card.dueDate) return;
       const cardEnd = new Date(card.dueDate.split("T")[0]);
       const cardStart = card.startDate
@@ -184,7 +190,14 @@ function WeekRow({
 
   const singleDayByDate = useMemo(() => {
     const map = new Map<string, Card[]>();
-    singleDay.forEach((card) => {
+
+    // Limit processing for performance
+    const MAX_CARDS_TO_PROCESS = 500;
+    const cardsToProcess = singleDay.length > MAX_CARDS_TO_PROCESS
+      ? singleDay.slice(0, MAX_CARDS_TO_PROCESS)
+      : singleDay;
+
+    cardsToProcess.forEach((card) => {
       const dk = card.dueDate!.split("T")[0];
       if (!map.has(dk)) map.set(dk, []);
       map.get(dk)!.push(card);
@@ -204,8 +217,14 @@ function WeekRow({
       isActualEnd: boolean;
     }
 
+    // Limit the number of cards for layout computation to prevent performance issues
+    const MAX_LAYOUT_CARDS = 100;
+    const spanningToProcess = spanning.length > MAX_LAYOUT_CARDS
+      ? spanning.slice(0, MAX_LAYOUT_CARDS)
+      : spanning;
+
     // First pass: compute column positions for each card
-    const cardPositions: LayoutCard[] = spanning.map((card) => {
+    const cardPositions: LayoutCard[] = spanningToProcess.map((card) => {
       const startStr = card.startDate!.split("T")[0];
       const endStr = card.dueDate!.split("T")[0];
 

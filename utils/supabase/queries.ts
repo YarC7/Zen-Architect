@@ -18,76 +18,103 @@ const supabase = createClient();
  * for all foreign-key joins.
  */
 export async function getProjectBoard(projectKey: string): Promise<BoardState> {
+  // Create a timeout promise to prevent hanging queries
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('getProjectBoard timed out after 15 seconds')), 15000);
+  });
+
   // 1. Fetch project meta by key
-  const { data: project, error: projectError } = (await supabase
-    .from("projects")
-    .select("*")
-    .eq("key", projectKey)
-    .single()) as {
-      data: {
-        id: string;
-        title: string;
-        background_type: string;
-        background_value: string;
-      } | null;
-      error: Error | null;
-    };
+  const projectPromise = (async () => {
+    const { data: project, error: projectError } = (await supabase
+      .from("projects")
+      .select("*")
+      .eq("key", projectKey)
+      .single()) as {
+        data: {
+          id: string;
+          title: string;
+          background_type: string;
+          background_value: string;
+        } | null;
+        error: Error | null;
+      };
 
-  if (projectError) throw projectError;
-  if (!project) throw new Error(`Project not found: ${projectKey}`);
+    if (projectError) throw projectError;
+    if (!project) throw new Error(`Project not found: ${projectKey}`);
 
-  // 2. Fetch columns ordered by position (exclude deleted)
-  const { data: columns, error: columnsError } = await supabase
-    .from("columns")
-    .select("*")
-    .eq("project_id", project.id)
-    .is("deleted_at", null)
-    .order("position", { ascending: true });
+    return project;
+  })();
 
-  if (columnsError) throw columnsError;
+  // Execute both the timeout and the query, whichever resolves first wins
+  const project = await Promise.race([projectPromise, timeoutPromise]);
 
-  // 3. Fetch cards with related data (exclude soft-deleted)
-  const { data: cards, error: cardsError } = await supabase
-    .from("cards")
-    .select(
-      `
-      *,
-      card_labels (labels (*)),
-      card_assignees (profiles (*)),
-      card_comments (*, profiles (*)),
-      checklist_items (*)
-    `,
-    )
-    .eq("project_id", project.id)
-    .is("deleted_at", null)
-    .order("position", { ascending: true });
+  // Fetch other data in parallel with a timeout
+  const otherDataPromise = Promise.all([
+    // 2. Fetch columns ordered by position (exclude deleted)
+    supabase
+      .from("columns")
+      .select("*")
+      .eq("project_id", project.id)
+      .is("deleted_at", null)
+      .order("position", { ascending: true }),
 
-  if (cardsError) throw cardsError;
+    // 3. Fetch cards with related data (exclude soft-deleted)
+    supabase
+      .from("cards")
+      .select(
+        `
+        *,
+        card_labels (labels (*)),
+        card_assignees (profiles (*)),
+        card_comments (*, profiles (*)),
+        checklist_items (*)
+      `,
+      )
+      .eq("project_id", project.id)
+      .is("deleted_at", null)
+      .order("position", { ascending: true }),
 
-  // 4. Fetch unique labels for this project (exclude soft-deleted)
-  const { data: labels, error: labelsError } = await supabase
-    .from("labels")
-    .select("*")
-    .eq("project_id", project.id)
-    .is("deleted_at", null);
+    // 4. Fetch unique labels for this project (exclude soft-deleted)
+    supabase
+      .from("labels")
+      .select("*")
+      .eq("project_id", project.id)
+      .is("deleted_at", null),
 
-  if (labelsError) throw labelsError;
+    // 5. Fetch activities
+    supabase
+      .from("activities")
+      .select("*")
+      .eq("project_id", project.id)
+      .order("created_at", { ascending: false })
+  ]);
 
-  // 5. Fetch activities
-  const { data: activities, error: activityError } = await supabase
-    .from("activities")
-    .select("*")
-    .eq("project_id", project.id)
-    .order("created_at", { ascending: false });
+  const timeoutPromise2 = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('getProjectBoard data fetch timed out after 15 seconds')), 15000);
+  });
 
-  if (activityError) throw activityError;
+  const [columnsResult, cardsResult, labelsResult, activitiesResult] = await Promise.race([
+    otherDataPromise,
+    timeoutPromise2
+  ]);
+
+  if (columnsResult.error) throw columnsResult.error;
+  if (cardsResult.error) throw cardsResult.error;
+  if (labelsResult.error) throw labelsResult.error;
+  if (activitiesResult.error) throw activitiesResult.error;
+
+  const columns = columnsResult.data;
+  const cards = cardsResult.data;
+  const labels = labelsResult.data;
+  const activities = activitiesResult.data;
 
   // --- TRANSFORM BACK TO BoardState ---
-
+  // Add safeguards to prevent infinite loops or crashes
+  const MAX_CARDS_PER_PROJECT = 10000; // Reasonable upper limit
   const cardsLookup: Record<string, Card> = {};
   const archivedCards: Record<string, Card> = {};
 
-  cards?.forEach((dbCard: any) => {
+  cards?.slice(0, MAX_CARDS_PER_PROJECT).forEach((dbCard: any) => {
     const formattedCard: Card = {
       id: dbCard.id,
       title: dbCard.title,
@@ -97,28 +124,32 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       dueDate: dbCard.due_date,
       startTime: dbCard.start_time,
       dueTime: dbCard.due_time,
-      labels: dbCard.card_labels.map((cl: any) => cl.labels),
-      assignees: dbCard.card_assignees.map((ca: any) => ({
+      labels: Array.isArray(dbCard.card_labels) ? dbCard.card_labels.map((cl: any) => cl.labels) : [],
+      assignees: Array.isArray(dbCard.card_assignees) ? dbCard.card_assignees.map((ca: any) => ({
         id: ca.profiles.id,
         name: ca.profiles.username || "Unknown",
         color: ca.profiles.color || "199 89% 48%",
-      })),
-      checklist: (dbCard.checklist_items || [])
-        .filter((ci: any) => !ci.deleted_at)
-        .sort((a: any, b: any) => a.position - b.position)
-        .map((ci: any) => ({
-          id: ci.id,
-          text: ci.text,
-          checked: ci.checked,
-        })),
-      comments: dbCard.card_comments
-        .filter((cc: any) => !cc.deleted_at)
-        .map((cc: any) => ({
-          id: cc.id,
-          author: cc.profiles.username || "System",
-          text: cc.text,
-          createdAt: cc.created_at,
-        })),
+      })) : [],
+      checklist: Array.isArray(dbCard.checklist_items)
+        ? dbCard.checklist_items
+            .filter((ci: any) => !ci.deleted_at)
+            .sort((a: any, b: any) => a.position - b.position)
+            .map((ci: any) => ({
+              id: ci.id,
+              text: ci.text,
+              checked: ci.checked,
+            }))
+        : [],
+      comments: Array.isArray(dbCard.card_comments)
+        ? dbCard.card_comments
+            .filter((cc: any) => !cc.deleted_at)
+            .map((cc: any) => ({
+              id: cc.id,
+              author: cc.profiles?.username || "System",
+              text: cc.text,
+              createdAt: cc.created_at,
+            }))
+        : [],
       createdAt: dbCard.created_at,
       updatedAt: dbCard.updated_at,
     };
@@ -130,15 +161,17 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
     }
   });
 
-  // Map card IDs to columns as originally expected by ZenArc UI
+  // Safely map card IDs to columns as originally expected by ZenArc UI
   const formattedColumns: Column[] = (columns || []).map((col: any) => ({
     id: col.id,
     title: col.title,
     color: col.color,
-    cardIds:
-      (cards || [])
-        ?.filter((c: any) => c.column_id === col.id && !c.is_archived)
-        .map((c: any) => c.id) || [],
+    cardIds: Array.isArray(cards)
+      ? cards
+          .filter((c: any) => c.column_id === col.id && !c.is_archived)
+          .map((c: any) => c.id)
+          .slice(0, 1000) // Limit card IDs per column to prevent memory issues
+      : [],
   }));
 
   return {

@@ -28,7 +28,7 @@ function genId(): string {
 
 export function useBoardForProject(projectKey: string) {
   const queryClient = useQueryClient();
-  const { data: board, isLoading } = useBoardQuery(projectKey);
+  const { data: board, isLoading, isError, error } = useBoardQuery(projectKey);
   const updateBoardMutation = useUpdateBoardMutation(projectKey);
   const pendingUpdateRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -722,6 +722,8 @@ export function useBoardForProject(projectKey: string) {
   return {
     board: board!,
     isLoading,
+    isError,
+    error,
     setBoard,
     setBoardTitle,
     addColumn,
