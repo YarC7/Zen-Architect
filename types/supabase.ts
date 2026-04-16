@@ -273,6 +273,81 @@ export interface Database {
           created_at?: string;
         };
       };
+      queue_jobs_log: {
+        Row: {
+          id: string;
+          queue_name: string;
+          msg_id: number;
+          payload: Json;
+          status: "completed" | "failed";
+          error: string | null;
+          processing_time_ms: number | null;
+          processed_at: string;
+        };
+        Insert: {
+          id?: string;
+          queue_name: string;
+          msg_id: number;
+          payload: Json;
+          status: "completed" | "failed";
+          error?: string | null;
+          processing_time_ms?: number | null;
+          processed_at?: string;
+        };
+        Update: {
+          id?: string;
+          queue_name?: string;
+          msg_id?: number;
+          payload?: Json;
+          status?: "completed" | "failed";
+          error?: string | null;
+          processing_time_ms?: number | null;
+          processed_at?: string;
+        };
+      };
+    };
+    Functions: {
+      pgmq_send: {
+        Args: {
+          queue_name: string;
+          msg: Json;
+          delay?: number;
+        };
+        Returns: number;
+      };
+      pgmq_read: {
+        Args: {
+          queue_name: string;
+          limit?: number;
+          vt?: number;
+        };
+        Returns: Array<{
+          msg_id: number;
+          read_ct: number;
+          enqueued_at: string;
+          msg: Json;
+        }>;
+      };
+      pgmq_delete: {
+        Args: {
+          queue_name: string;
+          msg_id: number;
+        };
+        Returns: boolean;
+      };
+      pgmq_archive: {
+        Args: {
+          queue_name: string;
+          msg_id: number;
+        };
+        Returns: boolean;
+      };
+      pgmq_purge: {
+        Args: {
+          queue_name: string;
+        };
+        Returns: number;
+      };
     };
   };
 }

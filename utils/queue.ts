@@ -20,7 +20,7 @@ export class QueueManager {
     payload: QueueJobPayload,
   ): Promise<bigint> {
     try {
-      const { data, error } = await this.supabase.rpc("pgmq_send", {
+      const { data, error } = await (this.supabase.rpc as any)("pgmq_send", {
         queue_name: queueName,
         msg: payload,
       });
@@ -50,7 +50,7 @@ export class QueueManager {
     vt: number = 30,
   ): Promise<QueueMessage[]> {
     try {
-      const { data, error } = await this.supabase.rpc("pgmq_read", {
+      const { data, error } = await (this.supabase.rpc as any)("pgmq_read", {
         queue_name: queueName,
         limit,
         vt,
@@ -74,7 +74,7 @@ export class QueueManager {
    */
   async delete(queueName: QueueName, msgId: bigint): Promise<void> {
     try {
-      const { error } = await this.supabase.rpc("pgmq_delete", {
+      const { error } = await (this.supabase.rpc as any)("pgmq_delete", {
         queue_name: queueName,
         msg_id: msgId,
       });
@@ -97,7 +97,7 @@ export class QueueManager {
    */
   async archive(queueName: QueueName, msgId: bigint): Promise<void> {
     try {
-      const { error } = await this.supabase.rpc("pgmq_archive", {
+      const { error } = await (this.supabase.rpc as any)("pgmq_archive", {
         queue_name: queueName,
         msg_id: msgId,
       });
@@ -131,16 +131,16 @@ export class QueueManager {
     processingTimeMs?: number,
   ): Promise<void> {
     try {
-      const { error: dbError } = await this.supabase
-        .from("queue_jobs_log")
-        .insert({
-          queue_name: queueName,
-          msg_id: Number(msgId),
-          payload,
-          status,
-          error: error || null,
-          processing_time_ms: processingTimeMs || null,
-        });
+      const { error: dbError } = await (
+        this.supabase.from("queue_jobs_log") as any
+      ).insert({
+        queue_name: queueName,
+        msg_id: Number(msgId),
+        payload,
+        status,
+        error: error || null,
+        processing_time_ms: processingTimeMs || null,
+      });
 
       if (dbError) {
         console.error(`[Queue] Error logging job result:`, dbError);
@@ -155,16 +155,18 @@ export class QueueManager {
    */
   async getStats(queueName: QueueName) {
     try {
-      const { data, error } = await this.supabase
-        .from("queue_jobs_log")
+      const { data, error } = await (
+        this.supabase.from("queue_jobs_log") as any
+      )
         .select("status")
         .eq("queue_name", queueName);
 
       if (error) throw error;
 
       const completed =
-        data?.filter((j) => j.status === "completed").length || 0;
-      const failed = data?.filter((j) => j.status === "failed").length || 0;
+        data?.filter((j: any) => j.status === "completed").length || 0;
+      const failed =
+        data?.filter((j: any) => j.status === "failed").length || 0;
 
       return { queueName, completed, failed, total: completed + failed };
     } catch (error) {
