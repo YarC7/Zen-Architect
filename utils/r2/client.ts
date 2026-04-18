@@ -5,6 +5,7 @@ import {
   ListObjectsV2Command,
   ListBucketsCommand,
 } from "@aws-sdk/client-s3";
+import { fetchWithCache, invalidateCache } from "../redis";
 
 /**
  * List all images from a specific prefix
@@ -48,6 +49,14 @@ export async function uploadToR2(file: File, key: string): Promise<string> {
 
     await r2Client.send(command);
 
+    // Invalidate stats and specific prefix cache (e.g. if key is backgrounds/foo.png)
+    const prefix = key.includes("/") ? key.substring(0, key.lastIndexOf("/") + 1) : "";
+    await invalidateCache([
+      "r2:stats:all", 
+      `r2:stats:${process.env.R2_BUCKET_NAME}`,
+      `r2:images:${prefix}`
+    ]);
+
     // Return public R2 URL
     const publicUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`;
     return publicUrl;
@@ -69,6 +78,13 @@ export async function deleteFromR2(key: string): Promise<void> {
     });
 
     await r2Client.send(command);
+    
+    const prefix = key.includes("/") ? key.substring(0, key.lastIndexOf("/") + 1) : "";
+    await invalidateCache([
+      "r2:stats:all", 
+      `r2:stats:${process.env.R2_BUCKET_NAME}`,
+      `r2:images:${prefix}`
+    ]);
   } catch (error) {
     console.error("Error deleting from R2:", error);
     throw new Error("Failed to delete file from R2");
@@ -93,68 +109,18 @@ export function generateR2Key(prefix: string, filename: string): string {
  * @returns Total used storage in bytes
  */
 export async function getBucketStats(): Promise<number> {
-  try {
-    const command = new ListObjectsV2Command({
-      Bucket: process.env.R2_BUCKET_NAME,
-    });
-
-    let totalSize = 0;
-    let continuationToken: string | undefined;
-
-    // Paginate through all objects
-    while (true) {
-      const response = await r2Client.send(
-        new ListObjectsV2Command({
-          Bucket: process.env.R2_BUCKET_NAME,
-          ContinuationToken: continuationToken,
-        }),
-      );
-
-      if (response.Contents) {
-        totalSize += response.Contents.reduce(
-          (sum, obj) => sum + (obj.Size || 0),
-          0,
-        );
-      }
-
-      if (response.IsTruncated && response.NextContinuationToken) {
-        continuationToken = response.NextContinuationToken;
-      } else {
-        break;
-      }
-    }
-
-    return totalSize;
-  } catch (error) {
-    console.error("Error getting bucket stats:", error);
-    throw new Error("Failed to get bucket stats");
-  }
-}
-
-/**
- * Get total storage stats across ALL buckets in R2 account
- * @returns Total used storage in bytes across all buckets
- */
-export async function getTotalBucketStats(): Promise<number> {
-  try {
-    // List all buckets
-    const listBucketsCommand = new ListBucketsCommand({});
-    const bucketsResponse = await r2Client.send(listBucketsCommand);
-
-    let totalSize = 0;
-
-    // Get stats for each bucket
-    if (bucketsResponse.Buckets) {
-      for (const bucket of bucketsResponse.Buckets) {
-        if (!bucket.Name) continue;
-
+  return fetchWithCache(
+    `r2:stats:${process.env.R2_BUCKET_NAME}`,
+    async () => {
+      try {
+        let totalSize = 0;
         let continuationToken: string | undefined;
 
-        // Paginate through all objects in this bucket
+        // Paginate through all objects
         while (true) {
           const response = await r2Client.send(
             new ListObjectsV2Command({
-              Bucket: bucket.Name,
+              Bucket: process.env.R2_BUCKET_NAME,
               ContinuationToken: continuationToken,
             }),
           );
@@ -172,58 +138,122 @@ export async function getTotalBucketStats(): Promise<number> {
             break;
           }
         }
-      }
-    }
 
-    return totalSize;
-  } catch (error) {
-    console.error("Error getting total bucket stats:", error);
-    throw new Error("Failed to get total bucket stats");
-  }
+        return totalSize;
+      } catch (error) {
+        console.error("Error getting bucket stats:", error);
+        throw new Error("Failed to get bucket stats");
+      }
+    },
+    600 // Cache for 10 minutes
+  );
+}
+
+/**
+ * Get total storage stats across ALL buckets in R2 account
+ * @returns Total used storage in bytes across all buckets
+ */
+export async function getTotalBucketStats(): Promise<number> {
+  return fetchWithCache(
+    "r2:stats:all",
+    async () => {
+      try {
+        // List all buckets
+        const listBucketsCommand = new ListBucketsCommand({});
+        const bucketsResponse = await r2Client.send(listBucketsCommand);
+
+        let totalSize = 0;
+
+        // Get stats for each bucket
+        if (bucketsResponse.Buckets) {
+          for (const bucket of bucketsResponse.Buckets) {
+            if (!bucket.Name) continue;
+
+            let continuationToken: string | undefined;
+
+            // Paginate through all objects in this bucket
+            while (true) {
+              const response = await r2Client.send(
+                new ListObjectsV2Command({
+                  Bucket: bucket.Name,
+                  ContinuationToken: continuationToken,
+                }),
+              );
+
+              if (response.Contents) {
+                totalSize += response.Contents.reduce(
+                  (sum, obj) => sum + (obj.Size || 0),
+                  0,
+                );
+              }
+
+              if (response.IsTruncated && response.NextContinuationToken) {
+                continuationToken = response.NextContinuationToken;
+              } else {
+                break;
+              }
+            }
+          }
+        }
+
+        return totalSize;
+      } catch (error) {
+        console.error("Error getting total bucket stats:", error);
+        throw new Error("Failed to get total bucket stats");
+      }
+    },
+    600 // Cache for 10 minutes
+  );
 }
 
 export async function listR2Images(prefix: string): Promise<R2Image[]> {
-  try {
-    const images: R2Image[] = [];
-    let continuationToken: string | undefined;
+  return fetchWithCache(
+    `r2:images:${prefix}`,
+    async () => {
+      try {
+        const images: R2Image[] = [];
+        let continuationToken: string | undefined;
 
-    // Paginate through objects with given prefix
-    while (true) {
-      const response = await r2Client.send(
-        new ListObjectsV2Command({
-          Bucket: process.env.R2_BUCKET_NAME,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        }),
-      );
+        // Paginate through objects with given prefix
+        while (true) {
+          const response = await r2Client.send(
+            new ListObjectsV2Command({
+              Bucket: process.env.R2_BUCKET_NAME,
+              Prefix: prefix,
+              ContinuationToken: continuationToken,
+            }),
+          );
 
-      if (response.Contents) {
-        response.Contents.forEach((obj) => {
-          if (obj.Key && obj.Size !== undefined) {
-            images.push({
-              key: obj.Key,
-              filename: obj.Key.split("/").pop() || obj.Key,
-              size: obj.Size,
-              lastModified: obj.LastModified || new Date(),
-              url: `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${obj.Key}`,
+          if (response.Contents) {
+            response.Contents.forEach((obj) => {
+              if (obj.Key && obj.Size !== undefined) {
+                images.push({
+                  key: obj.Key,
+                  filename: obj.Key.split("/").pop() || obj.Key,
+                  size: obj.Size,
+                  lastModified: obj.LastModified || new Date(),
+                  url: `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${obj.Key}`,
+                });
+              }
             });
           }
-        });
-      }
 
-      if (response.IsTruncated && response.NextContinuationToken) {
-        continuationToken = response.NextContinuationToken;
-      } else {
-        break;
-      }
-    }
+          if (response.IsTruncated && response.NextContinuationToken) {
+            continuationToken = response.NextContinuationToken;
+          } else {
+            break;
+          }
+        }
 
-    // Sort by most recent first
-    return images.sort(
-      (a, b) => b.lastModified.getTime() - a.lastModified.getTime(),
-    );
-  } catch (error) {
-    console.error("Error listing R2 images:", error);
-    throw new Error("Failed to list images");
-  }
+        // Sort by most recent first
+        return images.sort(
+          (a, b) => b.lastModified.getTime() - a.lastModified.getTime(),
+        );
+      } catch (error) {
+        console.error("Error listing R2 images:", error);
+        throw new Error("Failed to list images");
+      }
+    },
+    600 // Cache for 10 minutes
+  );
 }

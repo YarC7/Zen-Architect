@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { Database } from "@/types/supabase";
+import { fetchWithCache } from "@/utils/redis";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
@@ -55,7 +56,25 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // We extract the access_token out of the session directly to use as cache key
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  let user = session?.user || null;
+
+  if (session?.access_token) {
+    user = await fetchWithCache(
+      `auth:user:${session.access_token}`,
+      async () => {
+        const { data } = await supabase.auth.getUser();
+        return data.user;
+      },
+      60 // 1 minute TTL to dramatically cut down on db trips for rapid navigation
+    );
+  } else {
+    // Fallback if no local session found
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  }
 
   // Route protection logic
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
