@@ -38,6 +38,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
         title: string;
         background_type: string;
         background_value: string;
+        owner_id: string;
       } | null;
       error: Error | null;
     };
@@ -68,8 +69,8 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
         `
         *,
         card_labels (labels (*)),
-        card_assignees (profiles (*)),
-        card_comments (*, profiles (*)),
+        card_assignees (profiles!profile_id (*)),
+        card_comments (*, profiles!profile_id (*)),
         checklist_items (*)
       `,
       )
@@ -84,10 +85,10 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       .eq("project_id", project.id)
       .is("deleted_at", null),
 
-    // 5. Fetch activities
+    // 5. Fetch activities with user profiles
     supabase
       .from("activities")
-      .select("*")
+      .select("*, profiles!user_id(*)")
       .eq("project_id", project.id)
       .order("created_at", { ascending: false }),
   ]);
@@ -137,8 +138,9 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
       assignees: Array.isArray(dbCard.card_assignees)
         ? dbCard.card_assignees.map((ca: any) => ({
             id: ca.profiles.id,
-            name: ca.profiles.username || "Unknown",
+            name: ca.profiles.full_name || ca.profiles.username || "Unknown",
             color: ca.profiles.color || "199 89% 48%",
+            avatarUrl: ca.profiles.avatar_url,
           }))
         : [],
       checklist: Array.isArray(dbCard.checklist_items)
@@ -156,8 +158,9 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
             .filter((cc: any) => !cc.deleted_at)
             .map((cc: any) => ({
               id: cc.id,
-              author: cc.profiles?.username || "System",
+              author: cc.profiles?.full_name || cc.profiles?.username || "System",
               text: cc.text,
+              authorAvatarUrl: cc.profiles?.avatar_url,
               createdAt: cc.created_at,
             }))
         : [],
@@ -178,7 +181,9 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
     (activities || [])?.map((act: any) => ({
       id: act.id,
       type: act.type as any,
-      user: "User", // In a real app, join with profile
+      user: act.profiles?.full_name || act.profiles?.username || "User",
+      userId: act.user_id,
+      userAvatarUrl: act.profiles?.avatar_url,
       description: act.description,
       createdAt: act.created_at,
       cardId: act.card_id, // Include card_id to map to cards
@@ -191,6 +196,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
         id: activity.id,
         type: activity.type,
         user: activity.user,
+        userId: activity.userId,
         description: activity.description,
         createdAt: activity.createdAt,
       });
@@ -200,6 +206,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
         id: activity.id,
         type: activity.type,
         user: activity.user,
+        userId: activity.userId,
         description: activity.description,
         createdAt: activity.createdAt,
       });
@@ -236,6 +243,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
     labels: labels || [],
     archivedCards,
     activities: projectActivities,
+    ownerId: project.owner_id,
   };
 }
 
@@ -245,7 +253,7 @@ export async function getProjectBoard(projectKey: string): Promise<BoardState> {
 export async function getAllProfiles(): Promise<Assignee[]> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, full_name, color")
+    .select("id, username, full_name, color, avatar_url")
     .order("username", { ascending: true });
 
   if (error) throw error;
@@ -254,5 +262,6 @@ export async function getAllProfiles(): Promise<Assignee[]> {
     id: p.id,
     name: p.full_name || p.username || "Unknown",
     color: p.color || "199 89% 48%",
+    avatarUrl: p.avatar_url,
   }));
 }

@@ -32,6 +32,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserNav } from "@/components/auth/UserNav";
+
 
 export default function Projects() {
   const { projects, createProject, deleteProject, isLoading } = useProjects();
@@ -63,45 +65,52 @@ export default function Projects() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card px-6 py-4 flex items-center justify-between">
+      <header className="border-b bg-card px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <FolderKanban className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-bold text-foreground">Projects</h1>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" /> New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent aria-describedby="create-project-dialog">
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 py-2">
-              <Input
-                placeholder="Project name"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
-                }}
-                autoFocus
-              />
-              <Textarea
-                placeholder="Description (optional)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreate} disabled={!title.trim()}>
-                Create
+        <div className="flex items-center gap-4">
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5 shadow-sm">
+                <Plus className="h-4 w-4" /> New Project
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent aria-describedby="create-project-dialog">
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <Input
+                  placeholder="Project name"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreate();
+                  }}
+                  autoFocus
+                />
+                <Textarea
+                  placeholder="Description (optional)"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreate} disabled={!title.trim()}>
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <div className="h-8 w-px bg-zinc-800 mx-1 hidden sm:block" />
+
+          <UserNav />
+        </div>
+
       </header>
 
       <main className="p-6">

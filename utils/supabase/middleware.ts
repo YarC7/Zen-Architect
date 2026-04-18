@@ -11,7 +11,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // Use ANON key consistently
     {
       cookies: {
         get(name: string) {
@@ -55,7 +55,21 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Route protection logic
+  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  
+  // If no user and trying to access anything other than login, redirect to login
+  // Note: Matcher in root middleware filters static assets already.
+  if (!user && !isLoginPage) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // If user exists and trying to access login page, redirect to home/dashboard
+  if (user && isLoginPage) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
   return response;
 }

@@ -60,7 +60,7 @@ export function BoardHeader({
   const archivedCount = archivedCards ? Object.keys(archivedCards).length : 0;
 
   return (
-    <header className="flex items-center gap-3 px-6 py-4 border-b bg-card flex-wrap">
+    <header className="flex items-center gap-3 px-4 py-4 border-b bg-card flex-wrap">
       {editing ? (
         <Input
           autoFocus

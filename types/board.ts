@@ -8,6 +8,7 @@ export interface Assignee {
   id: string;
   name: string;
   color: string;
+  avatarUrl?: string;
 }
 
 export interface ChecklistItem {
@@ -19,16 +20,29 @@ export interface ChecklistItem {
 export interface Comment {
   id: string;
   author: string;
+  authorId?: string; // Profile ID for DB relation
+  authorAvatarUrl?: string; // Added avatar URL
   text: string;
   createdAt: string;
 }
 
 export interface Activity {
   id: string;
-  type: 'move' | 'create' | 'update' | 'delete' | 'comment';
+  type: 'move' | 'create' | 'update' | 'delete' | 'comment' | 'assign' | 'label' | 'checklist';
   user: string;
+  userId?: string;
+  userAvatarUrl?: string; // Added avatar URL
   description: string;
   createdAt: string;
+}
+
+export interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  createdAt: string;
+  size?: number;
 }
 
 export interface Card {
@@ -45,9 +59,11 @@ export interface Card {
   completed: boolean;
   comments?: Comment[];
   activities?: Activity[];
+  attachments?: Attachment[];
   createdAt?: string;
   updatedAt?: string;
 }
+
 
 export interface Column {
   id: string;
@@ -72,6 +88,7 @@ export interface BoardState {
   labels: Label[];
   archivedCards: Record<string, Card>;
   activities: Activity[];
+  ownerId?: string;
 }
 
 export const LABEL_PRESETS: Label[] = [
@@ -99,6 +116,7 @@ export const DEFAULT_BOARD: BoardState = {
   labels: LABEL_PRESETS,
   archivedCards: {},
   activities: [],
+  ownerId: '',
   columns: [
     { id: 'col-todo', title: 'To Do', color: '199 89% 48%', cardIds: ['card-1', 'card-2', 'card-3'] },
     { id: 'col-progress', title: 'In Progress', color: '25 95% 53%', cardIds: ['card-4', 'card-5'] },

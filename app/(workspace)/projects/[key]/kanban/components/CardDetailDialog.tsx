@@ -74,6 +74,7 @@ import {
   Assignee,
 } from "@/types/board";
 import { useProfilesQuery } from "@/hooks/useTanstackQuery";
+import { useUser } from "@/hooks/useUser";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,8 +134,8 @@ function DatePopover({
   const saveDates = () => {
     const normalizedDueDate =
       hasDueDate &&
-      selectedDate &&
-      (!selectedStartDate || selectedDate >= selectedStartDate)
+        selectedDate &&
+        (!selectedStartDate || selectedDate >= selectedStartDate)
         ? selectedDate
         : null;
 
@@ -533,17 +534,27 @@ function MemberPopoverContent({
                         isActive && "bg-muted/50",
                       )}
                     >
-                      <div
-                        className="h-10 w-10 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ring-1 ring-white/10 group-hover:ring-white/20 transition-all"
-                        style={{ backgroundColor: `hsl(${member.color})` }}
-                      >
-                        {member.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </div>
+                      <Avatar className="h-10 w-10 border shadow-sm ring-1 ring-white/10 group-hover:ring-white/20 transition-all">
+                        {member.avatarUrl ? (
+                          <img
+                            src={member.avatarUrl}
+                            alt={member.name}
+                            className="h-full w-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback
+                            className="text-xs font-bold text-white uppercase"
+                            style={{ backgroundColor: `hsl(${member.color})` }}
+                          >
+                            {member.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
                       <div className="flex-1">
                         <p className="font-semibold text-foreground">
                           {member.name}
@@ -579,6 +590,7 @@ export function CardDetailDialog({
   onDeleteLabel,
   onAddActivity,
 }: CardDetailDialogProps) {
+  const { profile, loading: profileLoading } = useUser();
   const [newComment, setNewComment] = useState("");
   const [newCheckItem, setNewCheckItem] = useState("");
   const [localTitle, setLocalTitle] = useState(card?.title || "");
@@ -671,11 +683,14 @@ export function CardDetailDialog({
 
   const addComment = () => {
     if (!newComment.trim()) return;
+    if (profileLoading) return; // Wait for profile to load
 
     const commentId = uuidv4();
     const comment: Comment = {
       id: commentId,
-      author: "User",
+      author: profile?.full_name || profile?.username || "User",
+      authorId: profile?.id,
+      authorAvatarUrl: profile?.avatar_url || undefined,
       text: newComment.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -683,7 +698,9 @@ export function CardDetailDialog({
     const activityId = uuidv4();
     const activity: Omit<Activity, "id" | "createdAt"> = {
       type: "comment",
-      user: "User",
+      user: profile?.full_name || profile?.username || "User",
+      userId: profile?.id,
+      userAvatarUrl: profile?.avatar_url || undefined,
       description: newComment.trim(),
     };
 
@@ -708,10 +725,12 @@ export function CardDetailDialog({
       ...c,
       feedType: "comment" as const,
     })),
-    ...(card.activities || []).map((a) => ({
-      ...a,
-      feedType: "activity" as const,
-    })),
+    ...(card.activities || [])
+      .filter((a) => a.type !== "comment") // Skip "comment" activities - comments already show in feed
+      .map((a) => ({
+        ...a,
+        feedType: "activity" as const,
+      })),
   ].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
@@ -994,14 +1013,25 @@ export function CardDetailDialog({
                         {card.assignees.map((a) => (
                           <div key={a.id} className="group relative">
                             <Avatar className="h-8 w-8 text-[11px] font-bold shadow-sm ring-2 ring-background transition-transform hover:scale-105">
-                              <AvatarFallback className="bg-slate-800 text-white">
-                                {a.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .slice(0, 2)
-                                  .toUpperCase()}
-                              </AvatarFallback>
+                              {a.avatarUrl ? (
+                                <img
+                                  src={a.avatarUrl}
+                                  alt={a.name}
+                                  className="h-full w-full object-cover rounded-full"
+                                />
+                              ) : (
+                                <AvatarFallback
+                                  className="text-white bg-slate-800"
+                                  style={{ backgroundColor: `hsl(${a.color})` }}
+                                >
+                                  {a.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              )}
                             </Avatar>
                             <button
                               onClick={() =>
@@ -1184,7 +1214,7 @@ export function CardDetailDialog({
                           className={cn(
                             "text-sm flex-1 break-words transition-all duration-300",
                             item.checked &&
-                              "line-through text-muted-foreground opacity-60",
+                            "line-through text-muted-foreground opacity-60",
                           )}
                         >
                           {item.text}
@@ -1300,23 +1330,30 @@ export function CardDetailDialog({
                           key={item.id}
                           className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
                         >
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/50">
-                            {activity.type === "comment" && (
-                              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Avatar className="h-8 w-8 shrink-0 border shadow-sm">
+                            {activity.userAvatarUrl ? (
+                              <img
+                                src={activity.userAvatarUrl}
+                                alt={activity.user}
+                                className="h-full w-full object-cover rounded-full"
+                              />
+                            ) : (
+                              <AvatarFallback className="bg-muted/50 text-[10px] font-bold">
+                                {activity.type === "move" && (
+                                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                                {activity.type === "update" && (
+                                  <History className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                                {activity.type === "create" && (
+                                  <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                                {activity.type === "delete" && (
+                                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </AvatarFallback>
                             )}
-                            {activity.type === "move" && (
-                              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                            {activity.type === "update" && (
-                              <History className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                            {activity.type === "create" && (
-                              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                            {activity.type === "delete" && (
-                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </div>
+                          </Avatar>
                           <div className="flex-1 space-y-1.5">
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-bold text-foreground">
@@ -1345,9 +1382,17 @@ export function CardDetailDialog({
                           className="flex gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
                         >
                           <Avatar className="h-8 w-8 shrink-0 border shadow-sm">
-                            <AvatarFallback className="bg-muted text-[10px] font-bold">
-                              {comment.author.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
+                            {comment.authorAvatarUrl ? (
+                              <img
+                                src={comment.authorAvatarUrl}
+                                alt={comment.author}
+                                className="h-full w-full object-cover rounded-full"
+                              />
+                            ) : (
+                              <AvatarFallback className="bg-muted text-[10px] font-bold">
+                                {comment.author.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            )}
                           </Avatar>
                           <div className="flex-1 space-y-1.5">
                             <div className="flex items-center justify-between">

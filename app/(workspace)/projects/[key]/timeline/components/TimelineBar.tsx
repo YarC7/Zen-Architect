@@ -107,12 +107,20 @@ export const TimelineBar = memo(function TimelineBar({
         </span>
         {card.assignees.length > 0 && (
           <Avatar className="h-5 w-5 shrink-0 border border-white/30 pointer-events-none">
-            <AvatarFallback
-              className="text-[8px] text-white"
-              style={{ backgroundColor: `hsl(${card.assignees[0].color})` }}
-            >
-              {card.assignees[0].name[0]}
-            </AvatarFallback>
+            {card.assignees[0].avatarUrl ? (
+              <img
+                src={card.assignees[0].avatarUrl}
+                alt={card.assignees[0].name}
+                className="h-full w-full object-cover rounded-full"
+              />
+            ) : (
+              <AvatarFallback
+                className="text-[8px] text-white"
+                style={{ backgroundColor: `hsl(${card.assignees[0].color})` }}
+              >
+                {card.assignees[0].name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            )}
           </Avatar>
         )}
       </div>

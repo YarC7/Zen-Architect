@@ -22,6 +22,7 @@ export interface Database {
           avatar_url: string | null;
           color: string | null;
           updated_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id: string;
@@ -30,6 +31,7 @@ export interface Database {
           avatar_url?: string | null;
           color?: string | null;
           updated_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: {
           id?: string;
@@ -38,7 +40,9 @@ export interface Database {
           avatar_url?: string | null;
           color?: string | null;
           updated_at?: string | null;
+          deleted_at?: string | null;
         };
+        Relationships: [];
       };
       projects: {
         Row: {
@@ -71,6 +75,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       columns: {
         Row: {
@@ -79,6 +84,7 @@ export interface Database {
           title: string;
           color: string;
           position: number;
+          owner_id: string;
           created_at: string;
         };
         Insert: {
@@ -87,6 +93,7 @@ export interface Database {
           title: string;
           color: string;
           position: number;
+          owner_id: string;
           created_at?: string;
         };
         Update: {
@@ -95,8 +102,10 @@ export interface Database {
           title?: string;
           color?: string;
           position?: number;
+          owner_id?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       cards: {
         Row: {
@@ -112,6 +121,7 @@ export interface Database {
           completed: boolean;
           is_archived: boolean;
           position: number;
+          owner_id: string;
           created_at: string;
           updated_at: string;
         };
@@ -128,6 +138,7 @@ export interface Database {
           completed?: boolean;
           is_archived?: boolean;
           position: number;
+          owner_id: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -142,10 +153,13 @@ export interface Database {
           start_time?: string | null;
           due_time?: string | null;
           completed?: boolean;
+          is_archived?: boolean;
           position?: number;
+          owner_id?: string;
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       labels: {
         Row: {
@@ -153,19 +167,23 @@ export interface Database {
           project_id: string;
           name: string;
           color: string;
+          owner_id: string;
         };
         Insert: {
           id?: string;
           project_id: string;
           name: string;
           color: string;
+          owner_id: string;
         };
         Update: {
           id?: string;
           project_id?: string;
           name?: string;
           color?: string;
+          owner_id?: string;
         };
+        Relationships: [];
       };
       card_labels: {
         Row: {
@@ -180,6 +198,7 @@ export interface Database {
           card_id?: string;
           label_id?: string;
         };
+        Relationships: [];
       };
       card_assignees: {
         Row: {
@@ -194,6 +213,7 @@ export interface Database {
           card_id?: string;
           profile_id?: string;
         };
+        Relationships: [];
       };
       checklist_items: {
         Row: {
@@ -202,6 +222,7 @@ export interface Database {
           text: string;
           checked: boolean;
           position: number;
+          owner_id: string;
         };
         Insert: {
           id?: string;
@@ -209,6 +230,7 @@ export interface Database {
           text: string;
           checked?: boolean;
           position: number;
+          owner_id: string;
         };
         Update: {
           id?: string;
@@ -216,7 +238,9 @@ export interface Database {
           text?: string;
           checked?: boolean;
           position?: number;
+          owner_id?: string;
         };
+        Relationships: [];
       };
       activities: {
         Row: {
@@ -246,6 +270,7 @@ export interface Database {
           description?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       color_swatches: {
         Row: {
@@ -272,6 +297,7 @@ export interface Database {
           category?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       queue_jobs_log: {
         Row: {
@@ -304,7 +330,11 @@ export interface Database {
           processing_time_ms?: number | null;
           processed_at?: string;
         };
+        Relationships: [];
       };
+    };
+    Views: {
+      [_ in never]: never;
     };
     Functions: {
       pgmq_send: {
@@ -348,6 +378,12 @@ export interface Database {
         };
         Returns: number;
       };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

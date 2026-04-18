@@ -129,71 +129,79 @@ export const KanbanCard = memo(function KanbanCard({
         card.startDate ||
         card.assignees.length > 0 ||
         checklist.length > 0) && (
-        <div className="flex items-center justify-between mt-2.5 gap-2 flex-wrap">
-          {(card.dueDate || card.startDate) && (
-            <div
-              className={cn(
-                "flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5",
-                isOverdue
-                  ? "bg-destructive/10 text-destructive"
-                  : "text-muted-foreground",
-              )}
-            >
-              <CalendarIcon className="h-3 w-3" />
-              {startDate && dueDate
-                ? `${format(startDate, "MMM d")} - ${format(dueDate, "MMM d")}`
-                : dueDate
-                  ? format(dueDate, "MMM d")
-                  : startDate
-                    ? format(startDate, "MMM d")
-                    : null}
-            </div>
-          )}
-          {checklist.length > 0 && (
-            <div
-              className={cn(
-                "flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5",
-                checkedCount === checklist.length
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground",
-              )}
-            >
-              <CheckSquare className="h-3 w-3" />
-              {checkedCount}/{checklist.length}
-            </div>
-          )}
-          {card.assignees.length > 0 && (
-            <div className="flex -space-x-1.5 ml-auto">
-              {card.assignees.slice(0, 3).map((a) => (
-                <Avatar
-                  key={a.id}
-                  className="h-5 w-5 text-[9px] ring-2 ring-card"
-                >
-                  <AvatarFallback
-                    style={{
-                      backgroundColor: `hsl(${a.color})`,
-                      color: "white",
-                      fontSize: "9px",
-                    }}
+          <div className="flex items-center justify-between mt-2.5 gap-2 flex-wrap">
+            {(card.dueDate || card.startDate) && (
+              <div
+                className={cn(
+                  "flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5",
+                  isOverdue
+                    ? "bg-destructive/10 text-destructive"
+                    : "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="h-3 w-3" />
+                {startDate && dueDate
+                  ? `${format(startDate, "MMM d")} - ${format(dueDate, "MMM d")}`
+                  : dueDate
+                    ? format(dueDate, "MMM d")
+                    : startDate
+                      ? format(startDate, "MMM d")
+                      : null}
+              </div>
+            )}
+            {checklist.length > 0 && (
+              <div
+                className={cn(
+                  "flex items-center gap-1 text-[11px] rounded px-1.5 py-0.5",
+                  checkedCount === checklist.length
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground",
+                )}
+              >
+                <CheckSquare className="h-3 w-3" />
+                {checkedCount}/{checklist.length}
+              </div>
+            )}
+            {card.assignees.length > 0 && (
+              <div className="flex -space-x-1.5 ml-auto">
+                {card.assignees.slice(0, 3).map((a) => (
+                  <Avatar
+                    key={a.id}
+                    className="h-5 w-5 text-[9px] ring-2 ring-card"
                   >
-                    {a.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-              {card.assignees.length > 3 && (
-                <Avatar className="h-5 w-5 text-[9px] ring-2 ring-card">
-                  <AvatarFallback
-                    className="bg-muted text-muted-foreground"
-                    style={{ fontSize: "9px" }}
-                  >
-                    +{card.assignees.length - 3}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                    {a.avatarUrl ? (
+                      <img
+                        src={a.avatarUrl}
+                        alt={a.name}
+                        className="h-full w-full object-cover rounded-full"
+                      />
+                    ) : (
+                      <AvatarFallback
+                        style={{
+                          backgroundColor: `hsl(${a.color})`,
+                          color: "white",
+                          fontSize: "9px",
+                        }}
+                      >
+                        {a.name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                ))}
+                {card.assignees.length > 3 && (
+                  <Avatar className="h-5 w-5 text-[9px] ring-2 ring-card">
+                    <AvatarFallback
+                      className="bg-muted text-muted-foreground"
+                      style={{ fontSize: "9px" }}
+                    >
+                      +{card.assignees.length - 3}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+            )}
+          </div>
+        )}
     </div>
   );
 });

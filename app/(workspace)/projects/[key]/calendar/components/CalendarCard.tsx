@@ -46,12 +46,20 @@ export function CalendarCard({
           <div className="flex -space-x-1 shrink-0 mt-0.5">
             {card.assignees.slice(0, 3).map((a) => (
               <Avatar key={a.id} className="h-5 w-5 border-2 border-card">
-                <AvatarFallback
-                  className="text-[8px] text-white font-medium"
-                  style={{ backgroundColor: `hsl(${a.color})` }}
-                >
-                  {a.name[0]}
-                </AvatarFallback>
+                {a.avatarUrl ? (
+                  <img
+                    src={a.avatarUrl}
+                    alt={a.name}
+                    className="h-full w-full object-cover rounded-full"
+                  />
+                ) : (
+                  <AvatarFallback
+                    className="text-[8px] text-white font-medium"
+                    style={{ backgroundColor: `hsl(${a.color})` }}
+                  >
+                    {a.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                )}
               </Avatar>
             ))}
           </div>

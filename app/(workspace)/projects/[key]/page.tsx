@@ -22,6 +22,8 @@ import type { TimelineViewType } from "./timeline/types";
 import { CalendarView } from "./calendar";
 import { CardDetailDialog } from "./kanban/components/CardDetailDialog";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { UserNav } from "@/components/auth/UserNav";
+
 
 export default function ProjectDetail() {
   const params = useParams<{ key: string }>();

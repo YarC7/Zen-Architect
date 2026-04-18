@@ -22,6 +22,7 @@ import {
   Loader2,
   ImageIcon,
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Label,
   BoardBackground,
@@ -746,28 +747,52 @@ export function BoardSettings({
                   <div className="space-y-3">
                     {[...activities].reverse().map((activity) => (
                       <div key={activity.id} className="flex gap-3 text-sm">
-                        <div className="mt-1">
-                          {activity.type === "create" && (
-                            <span className="text-green-500">+</span>
-                          )}
-                          {activity.type === "update" && (
-                            <span className="text-blue-500">~</span>
-                          )}
-                          {activity.type === "delete" && (
-                            <span className="text-red-500">-</span>
-                          )}
-                          {activity.type === "move" && (
-                            <span className="text-orange-500">&rarr;</span>
-                          )}
-                          {activity.type === "comment" && (
-                            <span className="text-purple-500">#</span>
-                          )}
+                        <div className="flex flex-col items-center gap-1 min-w-[32px]">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={activity.userAvatarUrl} />
+                            <AvatarFallback className="bg-muted text-[10px]">
+                              {activity.user
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex items-center justify-center">
+                            {activity.type === "create" && (
+                              <Badge className="h-4 w-4 p-0 flex items-center justify-center bg-green-500 hover:bg-green-600 text-[10px]">
+                                +
+                              </Badge>
+                            )}
+                            {activity.type === "update" && (
+                              <Badge className="h-4 w-4 p-0 flex items-center justify-center bg-blue-500 hover:bg-blue-600 text-[10px]">
+                                ~
+                              </Badge>
+                            )}
+                            {activity.type === "delete" && (
+                              <Badge className="h-4 w-4 p-0 flex items-center justify-center bg-red-500 hover:bg-red-600 text-[10px]">
+                                -
+                              </Badge>
+                            )}
+                            {activity.type === "move" && (
+                              <Badge className="h-4 w-4 p-0 flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-[10px]">
+                                &rarr;
+                              </Badge>
+                            )}
+                            {activity.type === "comment" && (
+                              <Badge className="h-4 w-4 p-0 flex items-center justify-center bg-purple-500 hover:bg-purple-600 text-[10px]">
+                                #
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p>{activity.description}</p>
+                        <div className="flex-1 space-y-1">
+                          <p className="leading-tight">{activity.description}</p>
                           <p className="text-xs text-muted-foreground">
-                            {activity.user} &middot;{" "}
-                            {new Date(activity.createdAt).toLocaleString()}
+                            <span className="font-medium text-foreground">
+                              {activity.user}
+                            </span>{" "}
+                            &middot; {new Date(activity.createdAt).toLocaleString()}
                           </p>
                         </div>
                       </div>
