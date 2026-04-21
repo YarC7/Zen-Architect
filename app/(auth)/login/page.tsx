@@ -96,6 +96,29 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
+
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-zinc-200" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-zinc-500">Demo Account</span>
+              </div>
+            </div>
+            <div className="">
+              <Button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  document.getElementById("email")?.setAttribute("value", "admin@zenarc.com");
+                  document.getElementById("password")?.setAttribute("value", "admin@123");
+                }}
+                className="w-full bg-zinc-900 text-white hover:bg-zinc-800 h-11 mt-2 shadow-lg shadow-zinc-200 transition-all active:scale-[0.98]"
+              >
+                Email: admin@zenarc.com / Password: admin@123
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
